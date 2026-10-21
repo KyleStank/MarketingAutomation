@@ -1,0 +1,24 @@
+root = true
+
+[*.cs]
+charset = utf-8
+indent_style = space
+indent_size = 4
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 120
+
+csharp_new_line_before_open_brace = all
+csharp_prefer_braces = true:warning
+csharp_preserve_single_line_blocks = false
+csharp_preserve_single_line_statements = false
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+dotnet_diagnostic.IDE0011.severity = warning
+dotnet_diagnostic.IDE0055.severity = warning
+
+[**/obj/**/*.cs]
+generated_code = true
