@@ -91,6 +91,7 @@ public sealed class AutomationScreen : MonoBehaviour
                 .onClick.AddListener(() => OpenPage(page));
             dot.gameObject.AddComponent<tooltip>().c = index == 0 ? "Products" : "Campaign";
         }
+
         var left = NativeUi.CopyTree(sourceLeft.transform, window, menuManager);
         PlaceFooter(left, new Vector2(0.5f, 0f), new Vector2(-69.9f, 38.6f));
         previousPageButton = NativeUi.AddButton(left, sourceLeft);
@@ -148,9 +149,12 @@ public sealed class AutomationScreen : MonoBehaviour
         var issue = AutomationFormState.Validate(count, campaignControls.HasSelectedCampaign);
         if (issue != AutomationValidation.None)
         {
-            form.OpenPage(issue == AutomationValidation.MissingProducts ? AutomationPage.Products : AutomationPage.Campaign);
+            form.OpenPage(issue == AutomationValidation.MissingProducts
+                ? AutomationPage.Products
+                : AutomationPage.Campaign);
             RefreshPages();
         }
+
         string error = null;
         if (issue == AutomationValidation.None)
         {
@@ -158,7 +162,8 @@ public sealed class AutomationScreen : MonoBehaviour
             try
             {
                 if (MarketingQueue.TryStart(boundRoom, menuManager, selected, campaignControls.SelectedCampaign,
-                    campaignControls.SelectedThreshold, campaignControls.SelectedPriority, campaignControls.SelectedDirection, out error))
+                        campaignControls.SelectedThreshold, campaignControls.SelectedPriority,
+                        campaignControls.SelectedDirection, out error))
                 {
                     started();
                     return;
@@ -170,6 +175,7 @@ public sealed class AutomationScreen : MonoBehaviour
                 error = "Marketing automation could not start. Please check the plugin log for details.";
             }
         }
+
         validationDialog = menuManager.uiObjects[40];
         validationDialogSiblingIndex = validationDialog.transform.GetSiblingIndex();
         ownsValidationDialog = true;
@@ -225,7 +231,8 @@ public sealed class AutomationScreen : MonoBehaviour
         campaignControls.Show(room.mS_);
         productList.Show(room.mS_, soundEffects);
         RefreshPages();
-        MarketingAutomationPlugin.Logger.LogInfo($"Automation catalog for room {room.myID}: {productList.ProductCount} products.");
+        MarketingAutomationPlugin.Logger.LogInfo(
+            $"Automation catalog for room {room.myID}: {productList.ProductCount} products.");
     }
 
     private void OnEnable()

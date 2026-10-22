@@ -82,10 +82,12 @@ internal static class QueuePersistence
         {
             state.Suspended = MarketingQueue.SuspendForSave(save);
         }
+
         return state;
     }
 
-    internal static void FinishSave(savegameScript save, ES3Writer writer, QueueSaveCheckpoint state, Exception nativeError)
+    internal static void FinishSave(savegameScript save, ES3Writer writer, QueueSaveCheckpoint state,
+        Exception nativeError)
     {
         if (state == null)
         {
@@ -99,6 +101,7 @@ internal static class QueuePersistence
                 PersistenceDiagnostics.Record("Native save failed; no new queue checkpoint published.", nativeError);
                 return;
             }
+
             if (!state.Company || state.Company.multiplayer)
             {
                 return;
@@ -110,20 +113,23 @@ internal static class QueuePersistence
             }
 
             if (state.Snapshot == null || writer == null || writer.settings.location != ES3.Location.File ||
-                !string.Equals(state.Path, System.IO.Path.GetFullPath(writer.settings.FullPath), StringComparison.OrdinalIgnoreCase))
+                !string.Equals(state.Path, System.IO.Path.GetFullPath(writer.settings.FullPath),
+                    StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidDataException("The native save destination differs from the captured checkpoint.");
             }
 
             Store(state.Path).Publish(state.Path, state.Snapshot);
-            MarketingAutomationPlugin.Logger.LogInfo($"Saved {state.Snapshot.Rooms.Length} active Marketing queues for slot snapshot {System.IO.Path.GetFileName(state.Path)}.");
+            MarketingAutomationPlugin.Logger.LogInfo(
+                $"Saved {state.Snapshot.Rooms.Length} active Marketing queues for slot snapshot {System.IO.Path.GetFileName(state.Path)}.");
         }
         catch (Exception exception)
         {
-            MarketingAutomationPlugin.Logger.LogError($"The native game saved, but Marketing queue data could not be saved: {exception}");
+            MarketingAutomationPlugin.Logger.LogError(
+                $"The native game saved, but Marketing queue data could not be saved: {exception}");
             PersistenceDiagnostics.Record($"Checkpoint publication failed for {state.Path}.", exception);
             Notify(save, "The game was saved, but its Marketing automation settings could not be saved. " +
-                "Automation may not resume when this save is loaded. Check the plugin log for details.");
+                         "Automation may not resume when this save is loaded. Check the plugin log for details.");
         }
         finally
         {
@@ -140,7 +146,8 @@ internal static class QueuePersistence
                         catch (Exception exception)
                         {
                             queue.Stop("Save cleanup failed.");
-                            MarketingAutomationPlugin.Logger.LogError($"Marketing queue save cleanup failed: {exception}");
+                            MarketingAutomationPlugin.Logger.LogError(
+                                $"Marketing queue save cleanup failed: {exception}");
                             PersistenceDiagnostics.Record("Queue cleanup after saving failed.", exception);
                         }
                     }
@@ -166,7 +173,8 @@ internal static class QueuePersistence
         }
         catch (Exception exception)
         {
-            MarketingAutomationPlugin.Logger.LogWarning($"Marketing automation data is unavailable for this load: {exception}");
+            MarketingAutomationPlugin.Logger.LogWarning(
+                $"Marketing automation data is unavailable for this load: {exception}");
             PersistenceDiagnostics.Record($"Checkpoint read failed for slot {slot}.", exception);
             return new QueueLoadCheckpoint { Match = SnapshotMatch.Damaged };
         }
@@ -184,9 +192,11 @@ internal static class QueuePersistence
         {
             if (state.Match == SnapshotMatch.Missing)
             {
-                MarketingAutomationPlugin.Logger.LogInfo("No matching Marketing automation snapshot. Native paid campaigns remain unchanged.");
+                MarketingAutomationPlugin.Logger.LogInfo(
+                    "No matching Marketing automation snapshot. Native paid campaigns remain unchanged.");
                 return;
             }
+
             if (state.Match != SnapshotMatch.Matched)
             {
                 throw new InvalidDataException($"Automation snapshot match result: {state.Match}.");
@@ -199,7 +209,8 @@ internal static class QueuePersistence
 
             if (!QueueSnapshotValidation.HeaderMatches(state.Snapshot, GameVersion, save.saveGameVersion, company.myID))
             {
-                throw new InvalidDataException("Automation snapshot game version, native format, or company does not match.");
+                throw new InvalidDataException(
+                    "Automation snapshot game version, native format, or company does not match.");
             }
 
             var seen = new HashSet<int>();
@@ -226,22 +237,28 @@ internal static class QueuePersistence
                 catch (Exception exception)
                 {
                     failed++;
-                    MarketingAutomationPlugin.Logger.LogWarning($"Marketing queue for room {record.RoomId} was not restored: {exception.Message}");
-                    PersistenceDiagnostics.Record($"Room {record.RoomId} restoration failed for {state.Path}.", exception);
+                    MarketingAutomationPlugin.Logger.LogWarning(
+                        $"Marketing queue for room {record.RoomId} was not restored: {exception.Message}");
+                    PersistenceDiagnostics.Record($"Room {record.RoomId} restoration failed for {state.Path}.",
+                        exception);
                 }
             }
-            MarketingAutomationPlugin.Logger.LogInfo($"Restored {restored} Marketing queues without purchasing campaigns; {failed} could not be matched.");
+
+            MarketingAutomationPlugin.Logger.LogInfo(
+                $"Restored {restored} Marketing queues without purchasing campaigns; {failed} could not be matched.");
             if (failed > 0)
             {
                 Notify(save, "Some Marketing automation could not be matched to this save and was left off. " +
-                    "Existing paid campaigns are unchanged. Configure automation again for the affected rooms.");
+                             "Existing paid campaigns are unchanged. Configure automation again for the affected rooms.");
             }
         }
         catch (Exception exception)
         {
             MarketingAutomationPlugin.Logger.LogWarning($"Marketing automation was not restored: {exception}");
-            PersistenceDiagnostics.Record($"Restoration failed for {state.Path}; snapshot match={state.Match}.", exception);
-            Notify(save, "Marketing automation was not restored because its saved settings are missing, damaged, or conflicting. " +
+            PersistenceDiagnostics.Record($"Restoration failed for {state.Path}; snapshot match={state.Match}.",
+                exception);
+            Notify(save,
+                "Marketing automation was not restored because its saved settings are missing, damaged, or conflicting. " +
                 "Existing paid campaigns are unchanged. Configure automation again to continue.");
         }
     }
@@ -290,10 +307,12 @@ internal static class QueuePersistence
                 selected.Add(match);
             }
         }
+
         taskMarketing paid = null;
         if (record.Paid != null)
         {
-            if (room.taskID != record.Paid.TaskId || !selected.Exists(product => record.Paid.Target.Matches(product.Key)))
+            if (room.taskID != record.Paid.TaskId ||
+                !selected.Exists(product => record.Paid.Target.Matches(product.Key)))
             {
                 throw new InvalidDataException("The paid campaign binding does not match.");
             }
@@ -312,15 +331,16 @@ internal static class QueuePersistence
                 paid.targetID != record.Paid.Target.Id || paid.kampagne != record.Campaign || paid.automatic ||
                 paid.stopAutomatic || paid.disableWarten)
             {
-                throw new InvalidDataException($"Native campaign identity/flags differ from checkpoint task {record.Paid.TaskId}; matches={matches}.");
+                throw new InvalidDataException(
+                    $"Native campaign identity/flags differ from checkpoint task {record.Paid.TaskId}; matches={matches}.");
             }
 
             if (!NativeCampaignProgress.Matches(record.Paid.Points, paid.points) ||
                 !NativeCampaignProgress.Matches(record.Paid.PointsLeft, paid.pointsLeft))
             {
                 throw new InvalidDataException($"Native campaign progress differs for task {paid.myID}: " +
-                    $"checkpoint total/left={record.Paid.Points:R}/{record.Paid.PointsLeft:R}, " +
-                    $"loaded total/left={paid.points:R}/{paid.pointsLeft:R}.");
+                                               $"checkpoint total/left={record.Paid.Points:R}/{record.Paid.PointsLeft:R}, " +
+                                               $"loaded total/left={paid.points:R}/{paid.pointsLeft:R}.");
             }
 
             foreach (var candidate in rooms)
@@ -363,6 +383,7 @@ public sealed class QueuePersistenceNotice : MonoBehaviour
             manager.MessageBox(message, false);
             manager.uiObjects[40].transform.SetAsLastSibling();
         }
+
         Destroy(this);
     }
 }

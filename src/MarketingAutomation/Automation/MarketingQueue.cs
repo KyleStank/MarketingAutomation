@@ -12,7 +12,10 @@ namespace MarketingAutomation.Automation;
 public sealed class MarketingQueue : MonoBehaviour
 {
     private static readonly HashSet<MarketingQueue> Instances = new();
-    private static readonly MethodInfo InitializeNativeTask = AccessTools.DeclaredMethod(typeof(taskMarketing), "FindScripts");
+
+    private static readonly MethodInfo InitializeNativeTask =
+        AccessTools.DeclaredMethod(typeof(taskMarketing), "FindScripts");
+
     private roomScript room;
     private GUI_Main manager;
     private List<MarketingProduct> products;
@@ -25,10 +28,13 @@ public sealed class MarketingQueue : MonoBehaviour
     private float scanTimer;
     private bool saveSuspended;
     private int resumeAfterFrame = -1;
+
     internal bool Running
     {
-        get; private set;
+        get;
+        private set;
     }
+
     internal bool Waiting => Running && boundTask && boundTask.GetComponent<taskWait>();
     internal bool Configured => scheduler != null;
     internal GUI_Main Manager => manager;
@@ -59,16 +65,19 @@ public sealed class MarketingQueue : MonoBehaviour
             error = "Marketing automation is available in single-player Marketing rooms only.";
             return false;
         }
+
         if (room.taskID != -1)
         {
             error = "This room already has a task. Finish or cancel it before starting a new automation queue.";
             return false;
         }
+
         if (products.Count == 0)
         {
             error = "Please select at least one available product.";
             return false;
         }
+
         // Validate native arrays/unlocks before committing the draft or spending anything.
         var options = NativeCampaignCatalog.Read(manager, room.mS_);
         if (campaign < 0 || campaign >= options.Length || !options[campaign].Unlocked)
@@ -76,6 +85,7 @@ public sealed class MarketingQueue : MonoBehaviour
             error = "The selected marketing campaign is unavailable.";
             return false;
         }
+
         var queue = ForRoom(room);
         if (!queue)
         {
@@ -87,7 +97,8 @@ public sealed class MarketingQueue : MonoBehaviour
         queue.products = new List<MarketingProduct>(products);
         queue.selectedIdentities = products.ConvertAll(product => ProductIdentity.From(product.Key)).ToArray();
         queue.campaign = campaign;
-        queue.scheduler = new QueueScheduler(Math.Max(0, Math.Min(threshold, options[campaign].HypeCap)), priority, direction);
+        queue.scheduler = new QueueScheduler(Math.Max(0, Math.Min(threshold, options[campaign].HypeCap)), priority,
+            direction);
         queue.Running = true;
         Instances.Add(queue);
         try
@@ -99,7 +110,9 @@ public sealed class MarketingQueue : MonoBehaviour
             queue.Stop("Starting the queue failed.");
             throw;
         }
-        MarketingAutomationPlugin.Logger.LogInfo($"Started Marketing queue in room {room.myID}: {products.Count} products, campaign {campaign}.");
+
+        MarketingAutomationPlugin.Logger.LogInfo(
+            $"Started Marketing queue in room {room.myID}: {products.Count} products, campaign {campaign}.");
         return true;
     }
 
@@ -119,6 +132,7 @@ public sealed class MarketingQueue : MonoBehaviour
                     Detach("The room's task was replaced or transferred.");
                     return;
                 }
+
                 if (!boundTask)
                 {
                     var completed = completedFrame >= 0;
@@ -134,6 +148,7 @@ public sealed class MarketingQueue : MonoBehaviour
                     return; // Paid work always finishes through native Work/Complete.
                 }
             }
+
             if (!Running || room.mS_.multiplayer || room.pause ||
                 (room.mS_.save_ && room.mS_.save_.loadingSavegame) || room.mS_.GetDeltaTime() <= 0f)
             {
@@ -169,6 +184,7 @@ public sealed class MarketingQueue : MonoBehaviour
             candidates.Add(new QueueCandidate(product.Key, product.Hype, product.ReleaseMonth, price,
                 option.Unlocked && product.CanMarket(room.mS_.myID), product.SortName));
         }
+
         var next = scheduler.Choose(candidates, room.mS_.money, option.HypeCap);
         if (next.HasValue)
         {
@@ -183,6 +199,7 @@ public sealed class MarketingQueue : MonoBehaviour
                 return;
             }
         }
+
         if (!boundTask)
         {
             CreateWaiter();
@@ -223,6 +240,7 @@ public sealed class MarketingQueue : MonoBehaviour
             Object.Destroy(task.gameObject);
             throw;
         }
+
         task.Init(false);
         task.targetID = product.Key.NativeId;
         task.typ = isGame ? 0 : 1;
@@ -237,7 +255,8 @@ public sealed class MarketingQueue : MonoBehaviour
         room.mS_.Pay(price, 12);
         ReleaseWaiter();
         Bind(task.gameObject, task.myID);
-        MarketingAutomationPlugin.Logger.LogInfo($"Marketing queue room {room.myID}: purchased campaign {campaign} for " +
+        MarketingAutomationPlugin.Logger.LogInfo(
+            $"Marketing queue room {room.myID}: purchased campaign {campaign} for " +
             $"{product.Key.Kind} {product.Key.NativeId}, cost {price}.");
     }
 
@@ -270,6 +289,7 @@ public sealed class MarketingQueue : MonoBehaviour
             Object.Destroy(boundTask);
             ClearBinding();
         }
+
         products = null;
         selectedIdentities = null;
         scheduler = null;
@@ -285,7 +305,8 @@ public sealed class MarketingQueue : MonoBehaviour
 
         if (wasConfigured)
         {
-            MarketingAutomationPlugin.Logger.LogInfo($"Marketing queue room {(room ? room.myID : -1)} stopped and cleared: {reason}");
+            MarketingAutomationPlugin.Logger.LogInfo(
+                $"Marketing queue room {(room ? room.myID : -1)} stopped and cleared: {reason}");
         }
     }
 
@@ -317,6 +338,7 @@ public sealed class MarketingQueue : MonoBehaviour
             room.taskID = -1;
             room.taskGameObject = null;
         }
+
         boundTask = null;
         boundId = -1;
         completedFrame = -1;
@@ -340,6 +362,7 @@ public sealed class MarketingQueue : MonoBehaviour
             queue.Stop("The mod is shutting down.");
             Object.Destroy(queue);
         }
+
         Instances.Clear();
     }
 
@@ -363,6 +386,7 @@ public sealed class MarketingQueue : MonoBehaviour
             queue.room.taskID = -1;
             queue.room.taskGameObject = null;
         }
+
         return suspended;
     }
 
@@ -379,6 +403,7 @@ public sealed class MarketingQueue : MonoBehaviour
             Detach("The task changed during native saving.");
             return;
         }
+
         boundTask.SetActive(true);
         room.taskID = boundId;
         room.taskGameObject = boundTask;
@@ -404,18 +429,22 @@ public sealed class MarketingQueue : MonoBehaviour
         var records = new List<RoomQueueSnapshot>();
         foreach (var queue in Instances)
         {
-            if (!queue || !queue.Running || !queue.Configured || !queue.room || !queue.room.mS_ || queue.room.mS_.save_ != save)
+            if (!queue || !queue.Running || !queue.Configured || !queue.room || !queue.room.mS_ ||
+                queue.room.mS_.save_ != save)
             {
                 continue;
             }
 
-            if (queue.boundTask ? !queue.Owns(queue.boundTask) : queue.completedFrame < 0 || queue.room.taskID != -1 && queue.room.taskID != queue.boundId)
+            if (queue.boundTask
+                    ? !queue.Owns(queue.boundTask)
+                    : queue.completedFrame < 0 || queue.room.taskID != -1 && queue.room.taskID != queue.boundId)
             {
                 continue; // A replaced/transferred/canceled task is never a resume checkpoint.
             }
 
             var selected = new List<ProductIdentity>(queue.selectedIdentities);
-            selected.Sort((left, right) => left.Kind != right.Kind ? left.Kind.CompareTo(right.Kind) : left.Id.CompareTo(right.Id));
+            selected.Sort((left, right) =>
+                left.Kind != right.Kind ? left.Kind.CompareTo(right.Kind) : left.Id.CompareTo(right.Id));
             var paid = queue.boundTask ? queue.boundTask.GetComponent<taskMarketing>() : null;
             var record = new RoomQueueSnapshot
             {
@@ -425,7 +454,9 @@ public sealed class MarketingQueue : MonoBehaviour
                 Priority = (int)queue.scheduler.Priority,
                 Direction = (int)queue.scheduler.Direction,
                 Products = selected.ToArray(),
-                Admitted = queue.scheduler.Admitted.HasValue ? ProductIdentity.From(queue.scheduler.Admitted.Value) : null
+                Admitted = queue.scheduler.Admitted.HasValue
+                    ? ProductIdentity.From(queue.scheduler.Admitted.Value)
+                    : null
             };
             if (paid && queue.completedFrame < 0 && paid.pointsLeft > 0f)
             {
@@ -445,6 +476,7 @@ public sealed class MarketingQueue : MonoBehaviour
 
             records.Add(record);
         }
+
         records.Sort((left, right) => left.RoomId.CompareTo(right.RoomId));
         return records.ToArray();
     }

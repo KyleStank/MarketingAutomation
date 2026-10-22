@@ -39,7 +39,8 @@ internal static class NativeCampaignCatalog
             if (games.maxHype[index] != consoles.maxHype[index] ||
                 games.hypeProKampagne[index] != consoles.hypeProKampagne[index])
             {
-                throw new NotSupportedException("Game/console campaign hype rules differ; shared controls need review.");
+                throw new NotSupportedException(
+                    "Game/console campaign hype rules differ; shared controls need review.");
             }
 
             options[index] = new NativeCampaignOption
@@ -50,10 +51,12 @@ internal static class NativeCampaignCatalog
                 ConsolePrice = consoles.preise[index],
                 HypeGain = games.hypeProKampagne[index],
                 HypeCap = games.maxHype[index],
-                Unlocked = index == 3 ? unlocks.Get(unlockScript.marketingInternet) :
-                    index != 4 || unlocks.Get(unlockScript.marketingStreamer)
+                Unlocked = index == 3
+                    ? unlocks.Get(unlockScript.marketingInternet)
+                    : index != 4 || unlocks.Get(unlockScript.marketingStreamer)
             };
         }
+
         return options;
     }
 }

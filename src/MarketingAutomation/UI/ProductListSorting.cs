@@ -16,14 +16,17 @@ internal readonly struct ProductSortValue
     {
         get;
     }
+
     internal string Name
     {
         get;
     }
+
     internal float Hype
     {
         get;
     }
+
     internal float ReleaseKey
     {
         get;
@@ -54,6 +57,7 @@ internal static class ProductListSorting
         {
             return comparison;
         }
+
         // Pooled row instance IDs cannot identify products. Stable typed IDs
         // resolve equal values without changing checkmarks as rows are recycled.
         comparison = left.Key.Kind.CompareTo(right.Key.Kind);

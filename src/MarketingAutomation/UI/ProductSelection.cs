@@ -2,7 +2,8 @@ namespace MarketingAutomation.UI;
 
 internal enum ProductKind
 {
-    Game, Console
+    Game,
+    Console
 }
 
 // Runtime instance identity prevents a replaced product from inheriting a draft
@@ -20,15 +21,20 @@ internal readonly struct ProductKey : IEquatable<ProductKey>
     {
         get;
     }
+
     internal int NativeId
     {
         get;
     }
+
     internal int InstanceId
     {
         get;
     }
-    public bool Equals(ProductKey other) => Kind == other.Kind && NativeId == other.NativeId && InstanceId == other.InstanceId;
+
+    public bool Equals(ProductKey other) =>
+        Kind == other.Kind && NativeId == other.NativeId && InstanceId == other.InstanceId;
+
     public override bool Equals(object other) => other is ProductKey key && Equals(key);
     public override int GetHashCode() => unchecked(((int)Kind * 397 ^ NativeId) * 397 ^ InstanceId);
 }
@@ -38,6 +44,7 @@ internal sealed class ProductSelection
     private readonly HashSet<ProductKey> selected = new();
     internal void Clear() => selected.Clear();
     internal bool Contains(ProductKey key) => selected.Contains(key);
+
     internal void Toggle(ProductKey key)
     {
         if (!selected.Add(key))
@@ -56,6 +63,7 @@ internal sealed class ProductSelection
                 count++;
             }
         }
+
         return count;
     }
 

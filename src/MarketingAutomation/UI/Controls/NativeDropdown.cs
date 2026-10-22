@@ -5,7 +5,8 @@ namespace MarketingAutomation.UI.Controls;
 
 internal static class NativeDropdown
 {
-    internal static Dropdown Create(Dropdown source, Transform parent, GUI_Main manager, string name, List<string> options)
+    internal static Dropdown Create(Dropdown source, Transform parent, GUI_Main manager, string name,
+        List<string> options)
     {
         var mapping = new Dictionary<Transform, RectTransform>();
         var root = NativeUi.CopyTree(source.transform, parent, manager, mapping: mapping);
@@ -21,6 +22,7 @@ internal static class NativeDropdown
             toggle.toggleTransition = original.toggleTransition;
             toggle.SetIsOnWithoutNotify(false);
         }
+
         foreach (var original in source.GetComponentsInChildren<Scrollbar>(true))
         {
             var scrollbar = mapping[original.transform].gameObject.AddComponent<Scrollbar>();
@@ -29,6 +31,7 @@ internal static class NativeDropdown
             scrollbar.direction = original.direction;
             scrollbar.numberOfSteps = original.numberOfSteps;
         }
+
         foreach (var original in source.GetComponentsInChildren<ScrollRect>(true))
         {
             var scroll = mapping[original.transform].gameObject.AddComponent<ScrollRect>();
@@ -41,15 +44,18 @@ internal static class NativeDropdown
             scroll.inertia = original.inertia;
             scroll.decelerationRate = original.decelerationRate;
             scroll.scrollSensitivity = original.scrollSensitivity;
-            scroll.horizontalScrollbar = original.horizontalScrollbar ?
-                mapping[original.horizontalScrollbar.transform].GetComponent<Scrollbar>() : null;
-            scroll.verticalScrollbar = original.verticalScrollbar ?
-                mapping[original.verticalScrollbar.transform].GetComponent<Scrollbar>() : null;
+            scroll.horizontalScrollbar = original.horizontalScrollbar
+                ? mapping[original.horizontalScrollbar.transform].GetComponent<Scrollbar>()
+                : null;
+            scroll.verticalScrollbar = original.verticalScrollbar
+                ? mapping[original.verticalScrollbar.transform].GetComponent<Scrollbar>()
+                : null;
             scroll.horizontalScrollbarVisibility = original.horizontalScrollbarVisibility;
             scroll.verticalScrollbarVisibility = original.verticalScrollbarVisibility;
             scroll.horizontalScrollbarSpacing = original.horizontalScrollbarSpacing;
             scroll.verticalScrollbarSpacing = original.verticalScrollbarSpacing;
         }
+
         var dropdown = root.gameObject.AddComponent<Dropdown>();
         CopySelectable(source, dropdown, mapping);
         dropdown.template = mapping[source.template];
@@ -67,7 +73,8 @@ internal static class NativeDropdown
     private static T Map<T>(T source, Dictionary<Transform, RectTransform> mapping) where T : Component =>
         source ? mapping[source.transform].GetComponent<T>() : null;
 
-    private static void CopySelectable(Selectable source, Selectable target, Dictionary<Transform, RectTransform> mapping)
+    private static void CopySelectable(Selectable source, Selectable target,
+        Dictionary<Transform, RectTransform> mapping)
     {
         target.targetGraphic = Map(source.targetGraphic, mapping);
         target.transition = source.transition;

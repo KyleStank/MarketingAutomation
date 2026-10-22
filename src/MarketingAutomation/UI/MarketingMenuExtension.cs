@@ -1,7 +1,6 @@
 using MarketingAutomation.UI.Controls;
 using UnityEngine;
 using UnityEngine.UI;
-using Object = UnityEngine.Object;
 
 namespace MarketingAutomation.UI;
 
@@ -40,14 +39,16 @@ public sealed class MarketingMenuExtension : MonoBehaviour
                 picker = menu;
                 Instances.Add(this);
                 Build();
-                MarketingAutomationPlugin.Logger.LogInfo("Automation entry and panel created for the Marketing picker.");
+                MarketingAutomationPlugin.Logger.LogInfo(
+                    "Automation entry and panel created for the Marketing picker.");
             }
         }
         catch (Exception exception)
         {
             failed = true;
             Cleanup();
-            MarketingAutomationPlugin.Logger.LogError($"Automation UI unavailable; native Marketing choices retained: {exception}");
+            MarketingAutomationPlugin.Logger.LogError(
+                $"Automation UI unavailable; native Marketing choices retained: {exception}");
         }
     }
 
@@ -86,7 +87,7 @@ public sealed class MarketingMenuExtension : MonoBehaviour
 
         // New controls copy visual properties only: no native callbacks or label scripts.
         var spacing = Mathf.Abs(((RectTransform)consoleButton.transform).anchoredPosition.y -
-            ((RectTransform)gameButton.transform).anchoredPosition.y);
+                                ((RectTransform)gameButton.transform).anchoredPosition.y);
         var entryButton = UiFactory.CreateMenuEntry("MarketingAutomationEntry", nativeWindow, gameButton,
             "Automation", FindAutomationIcon());
         entry = entryButton.gameObject;
@@ -116,6 +117,7 @@ public sealed class MarketingMenuExtension : MonoBehaviour
             MarketingAutomationPlugin.Logger.LogError($"Unable to open Automation product catalog: {exception}");
             return;
         }
+
         RestoreShortcuts();
         panel.transform.SetAsLastSibling();
         // Keep the picker underneath, as BUTTON_Game/BUTTON_Konsole do. Its Escape
@@ -128,6 +130,7 @@ public sealed class MarketingMenuExtension : MonoBehaviour
                 shortcut.enabled = false;
             }
         }
+
         soundEffects?.PlaySound(3, true);
         menuManager.ActivateMenu(panel);
         MarketingAutomationPlugin.Logger.LogInfo($"Opened Automation for Marketing room {room.myID}.");
@@ -161,6 +164,7 @@ public sealed class MarketingMenuExtension : MonoBehaviour
                 shortcut.enabled = true;
             }
         }
+
         suspendedShortcuts.Clear();
     }
 
@@ -198,6 +202,7 @@ public sealed class MarketingMenuExtension : MonoBehaviour
                 }
             }
         }
+
         throw new InvalidOperationException("Native room controls have no iconAutomatic sprite.");
     }
 
@@ -211,8 +216,9 @@ public sealed class MarketingMenuExtension : MonoBehaviour
             }
 
             extension.Cleanup();
-            Object.Destroy(extension);
+            Destroy(extension);
         }
+
         Instances.Clear();
     }
 
@@ -226,14 +232,16 @@ public sealed class MarketingMenuExtension : MonoBehaviour
             }
 
             panel.SetActive(false);
-            Object.Destroy(panel);
+            Destroy(panel);
         }
+
         RestoreShortcuts();
         if (entry)
         {
             entry.SetActive(false);
-            Object.Destroy(entry);
+            Destroy(entry);
         }
+
         if (layoutChanged && nativeWindow)
         {
             nativeWindow.sizeDelta = originalWindowSize;

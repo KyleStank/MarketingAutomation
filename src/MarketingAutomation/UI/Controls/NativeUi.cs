@@ -27,6 +27,7 @@ internal static class NativeUi
                 copy.material = manager.matFill_Window;
             }
         }
+
         if (text)
         {
             var copy = target.gameObject.AddComponent<Text>();
@@ -54,6 +55,7 @@ internal static class NativeUi
                 target.gameObject.AddComponent<setFont>();
             }
         }
+
         UiFactory.CopyEffects(source.gameObject, target.gameObject);
         var mask = source.GetComponent<Mask>();
         if (mask)
@@ -76,6 +78,7 @@ internal static class NativeUi
             copy.wrapMode = animation.wrapMode;
             copy.cullingType = animation.cullingType;
         }
+
         foreach (Transform child in source)
         {
             if (include == null || include(child))
@@ -83,6 +86,7 @@ internal static class NativeUi
                 CopyTree(child, target, manager, include, mapping);
             }
         }
+
         target.gameObject.SetActive(source.gameObject.activeSelf);
         return target;
     }

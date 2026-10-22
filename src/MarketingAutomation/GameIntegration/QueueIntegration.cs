@@ -7,9 +7,9 @@ using UnityEngine.UI;
 
 namespace MarketingAutomation.GameIntegration;
 
-internal static class QueueIntegration
+internal class QueueIntegration : BaseIntegration
 {
-    internal static void Install(Harmony harmony)
+    public override void Install(Harmony harmony)
     {
         Patch(harmony, typeof(taskMarketing), "Complete", postfix: nameof(AfterCampaignCompleted));
         Patch(harmony, typeof(taskMarketing), "Abbrechen", prefix: nameof(BeforeCampaignCanceled));
@@ -18,7 +18,8 @@ internal static class QueueIntegration
         Patch(harmony, typeof(roomWindow), "Window_Marketing", postfix: nameof(AfterCampaignDisplay));
         Patch(harmony, typeof(roomScript), "WaitForMinimumHype", postfix: nameof(AfterRoomWaitingCheck));
         Patch(harmony, typeof(roomButtonScript), "BUTTON_Main", prefix: nameof(BeforeRoomMenu));
-        Patch(harmony, typeof(roomButtonScript), "RemoveMenus", prefix: nameof(BeforeRoomPanelsPruned), postfix: nameof(AfterRoomPanelsPruned));
+        Patch(harmony, typeof(roomButtonScript), "RemoveMenus", prefix: nameof(BeforeRoomPanelsPruned),
+            postfix: nameof(AfterRoomPanelsPruned));
         Patch(harmony, typeof(roomButtonScript), "BUTTON_Marketing_AutoEnd", prefix: nameof(BeforeAutomationToggle));
         Patch(harmony, typeof(lockAutomatic), "OnEnable", prefix: nameof(BeforeAutomationLabel));
         Patch(harmony, typeof(Menu_W_Aufgabe_Abbrechen), "BUTTON_Yes", prefix: nameof(BeforeCancelConfirmed));
@@ -29,20 +30,8 @@ internal static class QueueIntegration
             finalizer: new HarmonyMethod(typeof(QueueIntegration), nameof(AfterSave)));
     }
 
-    private static void Patch(Harmony harmony, Type type, string name, string prefix = null, string postfix = null)
-    {
-        var target = AccessTools.DeclaredMethod(type, name);
-        if (target == null)
-        {
-            throw new MissingMethodException(type.FullName, name);
-        }
-
-        harmony.Patch(target,
-            prefix: prefix == null ? null : new HarmonyMethod(typeof(QueueIntegration), prefix),
-            postfix: postfix == null ? null : new HarmonyMethod(typeof(QueueIntegration), postfix));
-    }
-
-    private static void AfterCampaignCompleted(taskMarketing __instance) => MarketingQueue.ForTask(__instance)?.Completed(__instance);
+    private static void AfterCampaignCompleted(taskMarketing __instance) =>
+        MarketingQueue.ForTask(__instance)?.Completed(__instance);
 
     private static void BeforeCampaignCanceled(taskMarketing __instance) =>
         MarketingQueue.ForTask(__instance)?.Stop("The native campaign was canceled.");
@@ -59,6 +48,7 @@ internal static class QueueIntegration
         {
             return;
         }
+
         // Native Marketing cleanup destroys slot 26. Temporarily hide its
         // reference from that cleanup so the normal UpdateWindowWait path works.
         __state = __instance.uiWindows[26];
@@ -115,6 +105,7 @@ internal static class QueueIntegration
         {
             return true;
         }
+
         // Marketing has no native taskWait context branch. Use its normal active
         // campaign panel so Stop Automation and Cancel Task remain reachable.
         queue.Room.mS_.sfx_.PlaySound(3, true);
@@ -132,8 +123,9 @@ internal static class QueueIntegration
     private static bool BeforeAutomationToggle(roomButtonScript __instance)
     {
         var queue = MarketingQueue.ForRoom(__instance.rS_);
-        if (!queue || !MarketingQueue.ForTask(__instance.rS_.taskGameObject ?
-            __instance.rS_.taskGameObject.GetComponent<QueueTaskOwnership>() : null))
+        if (!queue || !MarketingQueue.ForTask(__instance.rS_.taskGameObject
+                ? __instance.rS_.taskGameObject.GetComponent<QueueTaskOwnership>()
+                : null))
         {
             return true;
         }
@@ -164,7 +156,8 @@ internal static class QueueIntegration
         __instance.lockGameObject.SetActive(false);
         __instance.GetComponent<Button>().interactable = queue.Running;
         __instance.transform.GetChild(0).GetComponent<Text>().text = queue.Running
-            ? room.mS_.tS_.GetText(168) : "Automation stopped";
+            ? room.mS_.tS_.GetText(168)
+            : "Automation stopped";
         return false;
     }
 
@@ -183,21 +176,25 @@ internal static class QueueIntegration
         {
             return;
         }
+
         // InitToggles replays a stored UI preference using Toggle.isOn, which
         // otherwise invokes the same confirmation used for an actual user click.
         // Seed only this toggle silently; preserve its preference and normal clicks.
-        __instance.uiObjects[2].GetComponent<Toggle>().SetIsOnWithoutNotify(PlayerPrefs.GetInt("Toggle_PickChars") == 1);
+        __instance.uiObjects[2].GetComponent<Toggle>()
+            .SetIsOnWithoutNotify(PlayerPrefs.GetInt("Toggle_PickChars") == 1);
     }
 
     private static void BeforeLoad(savegameScript __instance, int __0, out QueueLoadCheckpoint __state) =>
         __state = QueuePersistence.BeginLoad(__instance, __0);
 
-    private static void AfterLoad(savegameScript __instance, QueueLoadCheckpoint __state) => QueuePersistence.FinishLoad(__instance, __state);
+    private static void AfterLoad(savegameScript __instance, QueueLoadCheckpoint __state) =>
+        QueuePersistence.FinishLoad(__instance, __state);
 
     private static void BeforeSave(savegameScript __instance, int __0, out QueueSaveCheckpoint __state) =>
         __state = QueuePersistence.BeginSave(__instance, __0);
 
-    private static Exception AfterSave(savegameScript __instance, ES3Writer ___writer, QueueSaveCheckpoint __state, Exception __exception)
+    private static Exception AfterSave(savegameScript __instance, ES3Writer ___writer, QueueSaveCheckpoint __state,
+        Exception __exception)
     {
         QueuePersistence.FinishSave(__instance, ___writer, __state, __exception);
         return __exception; // Preserve native success/failure exactly.

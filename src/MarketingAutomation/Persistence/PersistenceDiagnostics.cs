@@ -11,11 +11,13 @@ internal static class PersistenceDiagnostics
         try
         {
             var path = Path.Combine(Paths.BepInExRootPath, "MarketingAutomation.IO.log");
-            File.AppendAllText(path, $"{DateTime.UtcNow:O} {message}{Environment.NewLine}{exception}{Environment.NewLine}");
+            File.AppendAllText(path,
+                $"{DateTime.UtcNow:O} {message}{Environment.NewLine}{exception}{Environment.NewLine}");
         }
         catch (Exception logError)
         {
-            MarketingAutomationPlugin.Logger.LogWarning($"Unable to retain Marketing IO diagnostics: {logError.Message}");
+            MarketingAutomationPlugin.Logger.LogWarning(
+                $"Unable to retain Marketing IO diagnostics: {logError.Message}");
         }
     }
 }

@@ -7,7 +7,10 @@ namespace MarketingAutomation.Persistence;
 
 internal enum SnapshotMatch
 {
-    Missing, Matched, Conflicting, Damaged
+    Missing,
+    Matched,
+    Conflicting,
+    Damaged
 }
 
 // Immutable, content-addressed history. Native files are only opened for reading.
@@ -47,6 +50,7 @@ internal sealed class QueueSnapshotStore
             ReadEnvelope(destination, fingerprint, length);
             return;
         }
+
         var temporary = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
@@ -61,6 +65,7 @@ internal sealed class QueueSnapshotStore
                 stream.Write(bytes, 0, bytes.Length);
                 stream.Flush(true);
             }
+
             File.Move(temporary, destination);
         }
         finally
@@ -94,6 +99,7 @@ internal sealed class QueueSnapshotStore
                 {
                     throw new InvalidDataException("Unsupported automation snapshot version.");
                 }
+
                 // Older records kept the pre-save float's extra digits. They
                 // describe the same paid progress when native serialization agrees.
                 NativeCampaignProgress.Normalize(snapshot);
@@ -105,18 +111,22 @@ internal sealed class QueueSnapshotStore
 
                 chosenPayload = comparablePayload;
             }
-            catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is SerializationException ||
-                exception is FormatException || exception is ArgumentException || exception is NullReferenceException)
+            catch (Exception exception) when (exception is IOException || exception is InvalidDataException ||
+                                              exception is SerializationException ||
+                                              exception is FormatException || exception is ArgumentException ||
+                                              exception is NullReferenceException)
             {
                 snapshot = null;
                 return SnapshotMatch.Damaged;
             }
         }
+
         if (conflicting)
         {
             snapshot = null;
             return SnapshotMatch.Conflicting;
         }
+
         return snapshot == null ? SnapshotMatch.Missing : SnapshotMatch.Matched;
     }
 
@@ -162,15 +172,10 @@ internal sealed class QueueSnapshotStore
     [DataContract]
     private sealed class SnapshotEnvelope
     {
-        [DataMember(Order = 0)]
-        internal int Schema;
-        [DataMember(Order = 1)]
-        internal string NativeHash;
-        [DataMember(Order = 2)]
-        internal long NativeLength;
-        [DataMember(Order = 3)]
-        internal string PayloadHash;
-        [DataMember(Order = 4)]
-        internal string Payload;
+        [DataMember(Order = 0)] internal int Schema;
+        [DataMember(Order = 1)] internal string NativeHash;
+        [DataMember(Order = 2)] internal long NativeLength;
+        [DataMember(Order = 3)] internal string PayloadHash;
+        [DataMember(Order = 4)] internal string Payload;
     }
 }

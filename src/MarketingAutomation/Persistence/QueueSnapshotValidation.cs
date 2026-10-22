@@ -4,14 +4,16 @@ namespace MarketingAutomation.Persistence;
 
 internal static class QueueSnapshotValidation
 {
-    internal static bool HeaderMatches(QueueSaveSnapshot snapshot, string gameVersion, int nativeFormat, int companyId) =>
+    internal static bool HeaderMatches(QueueSaveSnapshot snapshot, string gameVersion, int nativeFormat,
+        int companyId) =>
         snapshot != null && snapshot.Schema == 1 && snapshot.GameVersion == gameVersion &&
         snapshot.NativeFormat == nativeFormat && snapshot.CompanyId == companyId && snapshot.Rooms != null;
 
     internal static bool ValidRoom(RoomQueueSnapshot room)
     {
         if (room == null || room.RoomId <= 0 || room.Campaign < 0 || room.Campaign >= 6 || room.Threshold < 0 ||
-            !Enum.IsDefined(typeof(QueuePriority), room.Priority) || !Enum.IsDefined(typeof(QueueDirection), room.Direction) ||
+            !Enum.IsDefined(typeof(QueuePriority), room.Priority) ||
+            !Enum.IsDefined(typeof(QueueDirection), room.Direction) ||
             room.Products == null || room.Products.Length == 0)
         {
             return false;

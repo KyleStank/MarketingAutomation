@@ -70,6 +70,7 @@ internal static class UiFactory
                 CopyEffects(child.gameObject, text.gameObject);
                 continue;
             }
+
             var rect = CreateRect(child.name, button.transform);
             CopyRect((RectTransform)child, rect);
             if (sourceImage)
@@ -82,8 +83,10 @@ internal static class UiFactory
                     image.preserveAspect = true;
                 }
             }
+
             CopyEffects(child.gameObject, rect.gameObject);
         }
+
         return button;
     }
 
@@ -110,7 +113,8 @@ internal static class UiFactory
         }
     }
 
-    internal static Text CreateText(string name, Transform parent, Text style, string value, Vector2 position, Vector2 size)
+    internal static Text CreateText(string name, Transform parent, Text style, string value, Vector2 position,
+        Vector2 size)
     {
         var rect = CreateRect(name, parent);
         Place(rect, position, size);
@@ -146,6 +150,7 @@ internal static class UiFactory
             var text = CreateText("Label", rect, textStyle, label, Vector2.zero, size);
             Stretch(text.rectTransform);
         }
+
         return button;
     }
 }

@@ -7,18 +7,23 @@ internal sealed class MarketingProduct
 {
     private readonly gameScript game;
     private readonly platformScript console;
+
     internal ProductKey Key
     {
         get;
     }
+
     internal string SearchName
     {
         get;
     }
+
     internal string SortName => game ? game.GetNameSimple() : console.GetName();
+
     internal float NativeReleaseSortKey => game
         ? ProductListSorting.ReleaseKey(game.date_year, game.date_month, game.inDevelopment || game.schublade)
         : ProductListSorting.ReleaseKey(console.date_year, console.date_month, !console.isUnlocked);
+
     internal bool Exists => game || console;
     internal string Name => game ? game.GetNameWithTag() : console.GetName();
     internal float Hype => game ? game.GetHype() : console.GetHype();
@@ -26,6 +31,7 @@ internal sealed class MarketingProduct
     internal string Tooltip => game ? game.GetTooltip() : console.GetTooltip();
     internal gameScript NativeGame => game;
     internal platformScript NativeConsole => console;
+
     internal bool CanMarket(int companyId) => game
         ? (game.developerID == companyId || game.publisherID == companyId) &&
           (game.inDevelopment || game.isOnMarket || game.schublade) && !game.typ_contractGame &&
@@ -74,6 +80,7 @@ internal sealed class MarketingProduct
                 result.Add(new MarketingProduct(game));
             }
         }
+
         // Match Menu_Marketing_SelectKonsole.SetData, including unreleased consoles.
         foreach (var item in GameObject.FindGameObjectsWithTag("Platform"))
         {
@@ -83,6 +90,7 @@ internal sealed class MarketingProduct
                 result.Add(new MarketingProduct(console));
             }
         }
+
         return result;
     }
 
@@ -97,6 +105,7 @@ internal sealed class MarketingProduct
                 result.Add(new MarketingProduct(value, false));
             }
         }
+
         foreach (var item in GameObject.FindGameObjectsWithTag("Platform"))
         {
             var value = item.GetComponent<platformScript>();
@@ -105,6 +114,7 @@ internal sealed class MarketingProduct
                 result.Add(new MarketingProduct(value, false));
             }
         }
+
         return result;
     }
 }

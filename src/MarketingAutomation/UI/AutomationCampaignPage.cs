@@ -24,7 +24,8 @@ public sealed class AutomationCampaignPage : MonoBehaviour
     private sfxScript soundEffects;
 
     internal bool HasSelectedCampaign => configuration.HasSelection && options != null &&
-        options[configuration.SelectedCampaign].Unlocked;
+                                         options[configuration.SelectedCampaign].Unlocked;
+
     internal int SelectedThreshold => configuration.Threshold ?? 0;
     internal string SelectedCampaignName => HasSelectedCampaign ? options[configuration.SelectedCampaign].Name : "";
     internal string SelectedPrioritySummary => configuration.PrioritySummary;
@@ -52,7 +53,8 @@ public sealed class AutomationCampaignPage : MonoBehaviour
             var campaign = index;
             var style = templates.uiObjects[index + 2].GetComponent<Button>();
             var root = NativeUi.CopyTree(style.transform, transform, manager);
-            UiFactory.Place(root, new Vector2(index % 2 == 0 ? -140f : 140f, -272f - index / 2 * 94f), new Vector2(270f, 88f));
+            UiFactory.Place(root, new Vector2(index % 2 == 0 ? -140f : 140f, -272f - index / 2 * 94f),
+                new Vector2(270f, 88f));
             var button = NativeUi.AddButton(root, style);
             button.onClick.AddListener(() => Select(campaign));
             var name = NativeUi.Require<Text>(root, "Text");
@@ -78,6 +80,7 @@ public sealed class AutomationCampaignPage : MonoBehaviour
             cards[index] = new CampaignCard(root.GetComponent<Image>(), button, name, gamePrice,
                 consolePrice, gain, tooltip, lockRoot ? lockRoot.gameObject : null);
         }
+
         thresholdValue = UiFactory.CreateText("ThresholdValue", transform, textStyle, "",
             new Vector2(0f, -529f), new Vector2(550f, 26f));
         thresholdValue.resizeTextMaxSize = 18;
@@ -96,7 +99,8 @@ public sealed class AutomationCampaignPage : MonoBehaviour
         var heading = UiFactory.CreateText("QueuePriorityHeading", transform, textStyle, "Queue priority",
             new Vector2(0f, -88f), new Vector2(550f, 22f));
         heading.resizeTextMaxSize = 18;
-        var donor = menuManager.uiObjects[90].GetComponent<Menu_Marketing_SelectGame>().uiObjects[1].GetComponent<Dropdown>();
+        var donor = menuManager.uiObjects[90].GetComponent<Menu_Marketing_SelectGame>().uiObjects[1]
+            .GetComponent<Dropdown>();
         priorityField = NativeDropdown.Create(donor, transform, menuManager, "QueuePriority",
             ProductSortOptions.Labels());
         UiFactory.Place((RectTransform)priorityField.transform, new Vector2(-140f, -118f), new Vector2(270f, 32f));
@@ -113,7 +117,8 @@ public sealed class AutomationCampaignPage : MonoBehaviour
 
     private void UpdatePriority()
     {
-        configuration.SetPriority(ProductSortOptions.FromIndex(priorityField.value), (QueueDirection)priorityDirection.value);
+        configuration.SetPriority(ProductSortOptions.FromIndex(priorityField.value),
+            (QueueDirection)priorityDirection.value);
         priorityExplanation.text = configuration.PriorityExplanation;
     }
 
@@ -179,7 +184,8 @@ public sealed class AutomationCampaignPage : MonoBehaviour
     {
         for (var index = 0; index < cards.Length; index++)
         {
-            cards[index].Background.color = configuration.SelectedCampaign == index ? menuManager.colors[7] : Color.white;
+            cards[index].Background.color =
+                configuration.SelectedCampaign == index ? menuManager.colors[7] : Color.white;
         }
 
         threshold.interactable = HasSelectedCampaign;
@@ -197,9 +203,11 @@ public sealed class AutomationCampaignPage : MonoBehaviour
             thresholdExplanation.text = "Select a campaign to configure its hype threshold.";
             return;
         }
+
         thresholdValue.text = $"Hype threshold: {SelectedThreshold}";
         thresholdRange.text = $"0 - {configuration.HypeCap} hype";
-        thresholdExplanation.text = $"Selected products become eligible for marketing when their hype is at or below {SelectedThreshold}.\n" +
+        thresholdExplanation.text =
+            $"Selected products become eligible for marketing when their hype is at or below {SelectedThreshold}.\n" +
             $"Once marketing starts, it continues toward the campaign cap of {configuration.HypeCap}.";
     }
 
@@ -249,9 +257,9 @@ public sealed class AutomationCampaignPage : MonoBehaviour
             }
 
             details.c = $"{option.Name}\nGame: {company.GetMoney(option.GamePrice, true)}\n" +
-                $"Console: {company.GetMoney(option.ConsolePrice, true)}\n" +
-                $"+{option.HypeGain} hype per campaign, up to {option.HypeCap}." +
-                (option.Unlocked ? "" : "\nThis campaign has not been unlocked yet.");
+                        $"Console: {company.GetMoney(option.ConsolePrice, true)}\n" +
+                        $"+{option.HypeGain} hype per campaign, up to {option.HypeCap}." +
+                        (option.Unlocked ? "" : "\nThis campaign has not been unlocked yet.");
         }
     }
 }

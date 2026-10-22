@@ -79,6 +79,7 @@ internal sealed class ProductRow
             product = null;
             return;
         }
+
         root.anchoredPosition = new Vector2(0f, -offset);
         if (product != next)
         {
@@ -89,6 +90,7 @@ internal sealed class ProductRow
             icon.sprite = product.Icon;
             detailsTooltip.c = product.Tooltip;
         }
+
         checkmark.SetActive(selection.Contains(product.Key));
     }
 

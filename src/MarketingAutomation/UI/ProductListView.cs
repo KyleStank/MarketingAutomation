@@ -90,6 +90,7 @@ internal sealed class ProductListView
                 selected.Add(product);
             }
         }
+
         return selected;
     }
 
@@ -229,6 +230,7 @@ internal sealed class ProductListView
                 visibleProducts.Add(product);
             }
         }
+
         var sortValues = new Dictionary<ProductKey, ProductSortValue>(visibleProducts.Count);
         foreach (var product in visibleProducts)
         {
@@ -237,7 +239,8 @@ internal sealed class ProductListView
         }
 
         var field = ProductSortOptions.FromIndex(sortDropdown.value);
-        visibleProducts.Sort((left, right) => ProductListSorting.Compare(sortValues[left.Key], sortValues[right.Key], field));
+        visibleProducts.Sort((left, right) =>
+            ProductListSorting.Compare(sortValues[left.Key], sortValues[right.Key], field));
         content.sizeDelta = new Vector2(
             content.sizeDelta.x,
             Mathf.Max(scroll.viewport.rect.height, visibleProducts.Count * RowStride));
@@ -278,7 +281,9 @@ internal sealed class ProductListView
         selectAllButton.interactable = keys.Count > 0;
         selectAllCheckmark.SetActive(keys.Count > 0 && count == keys.Count);
         selectionSummary.text = $"{count} selected   |   {visibleProducts.Count} of {products.Count} products shown";
-        emptyMessage.text = products.Count == 0 ? "No products are available for marketing." : "No products match your search.";
+        emptyMessage.text = products.Count == 0
+            ? "No products are available for marketing."
+            : "No products match your search.";
         emptyMessage.gameObject.SetActive(visibleProducts.Count == 0);
     }
 
@@ -292,6 +297,7 @@ internal sealed class ProductListView
                 keys.Add(product.Key);
             }
         }
+
         return keys;
     }
 

@@ -18,22 +18,27 @@ internal readonly struct QueueCandidate
     {
         get;
     }
+
     internal float Hype
     {
         get;
     }
+
     internal int? ReleaseMonth
     {
         get;
     }
+
     internal long Price
     {
         get;
     }
+
     internal bool Eligible
     {
         get;
     }
+
     internal string Name
     {
         get;
@@ -90,6 +95,7 @@ internal sealed class QueueScheduler
                 best = candidate;
             }
         }
+
         admitted = best?.Key;
         return admitted;
     }
