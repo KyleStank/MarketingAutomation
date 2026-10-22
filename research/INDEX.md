@@ -141,4 +141,4 @@ Shared source definitions: [SOURCES.yaml](../tools/mgt2-mod-toolkit/research/SOU
 - `mgt2-managed-2026-10-22`: Installed managed inputs matched to the ILSpy inventory; source symbols inspected on 2026-10-22.
 - `mgt2-runtime-2026-10-22`: Fresh read-only PE/CLI/file-version/hash observations for original installed player/managed inputs and the Auxiliary comparison.
 - `mgt2-toolchain-2026-10-22`: Fresh installed loader/patch DLL identities and directly inspected clean BepInEx/HarmonyX source checkouts.
-- `mgt2-unity-export-2026-10-22`: Current reconstructed Unity scene/prefab/animation artifacts inspected on 2026-10-22; GUIDs are export-local.
+- `mgt2-unity-export-2026-10-22`: Reconstructed Unity scene/prefab/animation paths inspected on 2026-10-22; identifiers are export-local and paths are unhashed locators.
