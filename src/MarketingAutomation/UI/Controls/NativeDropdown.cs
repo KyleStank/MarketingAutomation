@@ -1,8 +1,7 @@
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace MarketingAutomation;
+namespace MarketingAutomation.UI.Controls;
 
 internal static class NativeDropdown
 {

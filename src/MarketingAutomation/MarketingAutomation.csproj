@@ -6,16 +6,25 @@
         <Product>MarketingAutomation</Product>
         <Version>1.0.0</Version>
         <LangVersion>latest</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-        
+
         <RestoreAdditionalProjectSources>
             https://api.nuget.org/v3/index.json;
             https://nuget.bepinex.dev/v3/index.json;
             https://nuget.samboy.dev/v3/index.json
         </RestoreAdditionalProjectSources>
         
-        <LibDirectory>$(MSBuildProjectDirectory)/../../lib</LibDirectory>
+        <RepositoryRoot>$(MSBuildProjectDirectory)/../..</RepositoryRoot>
+        <LibDirectory>$(RepositoryRoot)/lib</LibDirectory>
+        
+        <DeployToGame>true</DeployToGame>
     </PropertyGroup>
+
+    <!-- Global using -->
+    <ItemGroup>
+        <Using Include="System" />
+    </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="BepInEx.Analyzers" Version="1.*" PrivateAssets="all"/>
@@ -37,4 +46,20 @@
             <Private>false</Private>
         </Reference>
     </ItemGroup>
+
+    <Target Name="DeployPlugin" AfterTargets="Build"
+            Condition="'$(DesignTimeBuild)' != 'true' and '$(DeployToGame)' == 'true'">
+        <Error Condition="!Exists('$(RepositoryRoot)/.config.local')"
+               Text="Local configuration is missing. Run initialize.ps1 (Windows) or bash initialize.sh (Linux/macOS), or build with -p:DeployToGame=false."/>
+        
+        <Exec Condition="Exists('$(RepositoryRoot)/.config.local') and '$(OS)' == 'Windows_NT'"
+              WorkingDirectory="$(RepositoryRoot)"
+              EnvironmentVariables="MOD_ASSEMBLY=$(TargetPath)"
+              Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/deploy.ps1"/>
+        
+        <Exec Condition="Exists('$(RepositoryRoot)/.config.local') and '$(OS)' != 'Windows_NT'"
+              WorkingDirectory="$(RepositoryRoot)"
+              EnvironmentVariables="MOD_ASSEMBLY=$(TargetPath)"
+              Command="bash scripts/deploy.sh"/>
+    </Target>
 </Project>

@@ -1,11 +1,12 @@
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
+using MarketingAutomation.GameIntegration;
+using MarketingAutomation.Persistence;
+using MarketingAutomation.UI;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace MarketingAutomation;
+namespace MarketingAutomation.Automation;
 
 // Room-local live state. Persistent checkpoints are external to native saves.
 public sealed class MarketingQueue : MonoBehaviour
@@ -98,7 +99,7 @@ public sealed class MarketingQueue : MonoBehaviour
             queue.Stop("Starting the queue failed.");
             throw;
         }
-        MarketingAutomation.Logger.LogInfo($"Started Marketing queue in room {room.myID}: {products.Count} products, campaign {campaign}.");
+        MarketingAutomationPlugin.Logger.LogInfo($"Started Marketing queue in room {room.myID}: {products.Count} products, campaign {campaign}.");
         return true;
     }
 
@@ -149,7 +150,7 @@ public sealed class MarketingQueue : MonoBehaviour
         catch (Exception exception)
         {
             Stop("An execution error stopped automation; paid work is retained.");
-            MarketingAutomation.Logger.LogError($"Marketing queue failed in room {room.myID}: {exception}");
+            MarketingAutomationPlugin.Logger.LogError($"Marketing queue failed in room {room.myID}: {exception}");
         }
     }
 
@@ -194,7 +195,7 @@ public sealed class MarketingQueue : MonoBehaviour
         waiter.Init(false);
         waiter.art = -1; // Dormant: never dispatch QA work.
         Bind(waiter.gameObject, waiter.myID);
-        MarketingAutomation.Logger.LogInfo($"Marketing queue in room {room.myID} is Waiting.");
+        MarketingAutomationPlugin.Logger.LogInfo($"Marketing queue in room {room.myID} is Waiting.");
     }
 
     private void StartCampaign(MarketingProduct product, NativeCampaignOption option)
@@ -236,7 +237,7 @@ public sealed class MarketingQueue : MonoBehaviour
         room.mS_.Pay(price, 12);
         ReleaseWaiter();
         Bind(task.gameObject, task.myID);
-        MarketingAutomation.Logger.LogInfo($"Marketing queue room {room.myID}: purchased campaign {campaign} for " +
+        MarketingAutomationPlugin.Logger.LogInfo($"Marketing queue room {room.myID}: purchased campaign {campaign} for " +
             $"{product.Key.Kind} {product.Key.NativeId}, cost {price}.");
     }
 
@@ -284,7 +285,7 @@ public sealed class MarketingQueue : MonoBehaviour
 
         if (wasConfigured)
         {
-            MarketingAutomation.Logger.LogInfo($"Marketing queue room {(room ? room.myID : -1)} stopped and cleared: {reason}");
+            MarketingAutomationPlugin.Logger.LogInfo($"Marketing queue room {(room ? room.myID : -1)} stopped and cleared: {reason}");
         }
     }
 

@@ -1,8 +1,9 @@
-using System;
+using MarketingAutomation.Automation;
+using MarketingAutomation.UI.Controls;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace MarketingAutomation;
+namespace MarketingAutomation.UI;
 
 public sealed class AutomationScreen : MonoBehaviour
 {
@@ -165,7 +166,7 @@ public sealed class AutomationScreen : MonoBehaviour
             }
             catch (Exception exception)
             {
-                MarketingAutomation.Logger.LogError($"Unable to start Marketing queue: {exception}");
+                MarketingAutomationPlugin.Logger.LogError($"Unable to start Marketing queue: {exception}");
                 error = "Marketing automation could not start. Please check the plugin log for details.";
             }
         }
@@ -224,7 +225,7 @@ public sealed class AutomationScreen : MonoBehaviour
         campaignControls.Show(room.mS_);
         productList.Show(room.mS_, soundEffects);
         RefreshPages();
-        MarketingAutomation.Logger.LogInfo($"Automation catalog for room {room.myID}: {productList.ProductCount} products.");
+        MarketingAutomationPlugin.Logger.LogInfo($"Automation catalog for room {room.myID}: {productList.ProductCount} products.");
     }
 
     private void OnEnable()

@@ -1,12 +1,14 @@
-using System;
 using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
+using MarketingAutomation.Automation;
+using MarketingAutomation.GameIntegration;
+using MarketingAutomation.UI;
 
 namespace MarketingAutomation;
 
 [BepInPlugin(PluginMetadata.Guid, PluginMetadata.Name, PluginMetadata.Version)]
-public class MarketingAutomation : BaseUnityPlugin
+public class MarketingAutomationPlugin : BaseUnityPlugin
 {
     internal static new ManualLogSource Logger;
     private Harmony patches;
@@ -34,7 +36,7 @@ public class MarketingAutomation : BaseUnityPlugin
             }
 
             patches = new Harmony(PluginMetadata.Guid);
-            patches.Patch(initializeMenu, postfix: new HarmonyMethod(typeof(MarketingAutomation), nameof(AfterMarketingMenuInitialized)));
+            patches.Patch(initializeMenu, postfix: new HarmonyMethod(typeof(MarketingAutomationPlugin), nameof(AfterMarketingMenuInitialized)));
             QueueIntegration.Install(patches);
             Logger.LogInfo("Marketing Automation UI and queue patches installed.");
         }

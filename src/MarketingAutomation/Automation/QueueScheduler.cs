@@ -1,7 +1,6 @@
-using System;
-using System.Collections.Generic;
+using MarketingAutomation.UI;
 
-namespace MarketingAutomation;
+namespace MarketingAutomation.Automation;
 
 internal readonly struct QueueCandidate
 {

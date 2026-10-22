@@ -1,4 +1,4 @@
-namespace MarketingAutomation;
+namespace MarketingAutomation.UI;
 
 internal enum AutomationPage
 {

@@ -1,6 +1,4 @@
-using System;
-
-namespace MarketingAutomation;
+namespace MarketingAutomation.Automation;
 
 // Keep persisted numeric values stable; dropdown order is mapped separately.
 internal enum QueuePriority

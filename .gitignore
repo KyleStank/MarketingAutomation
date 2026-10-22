@@ -1,6 +1,15 @@
+# IDEs
 .idea
 .junie
-AssetRipper
-reference
+
+# .NET
 obj
 bin
+*.DotSettings.user
+
+# Project development
+reference
+/.config.local
+/tests/DevelopmentScripts/.tmp.*/
+/.agents/skills/mgt2-researcher
+/.agents/skills/mgt2-architecture

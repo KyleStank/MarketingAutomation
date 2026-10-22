@@ -1,9 +1,11 @@
-using System;
 using HarmonyLib;
+using MarketingAutomation.Automation;
+using MarketingAutomation.Persistence;
+using MarketingAutomation.UI.Controls;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace MarketingAutomation;
+namespace MarketingAutomation.GameIntegration;
 
 internal static class QueueIntegration
 {

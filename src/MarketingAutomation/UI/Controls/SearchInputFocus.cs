@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-namespace MarketingAutomation;
+namespace MarketingAutomation.UI.Controls;
 
 public sealed class SearchInputFocus : MonoBehaviour, ISelectHandler, IDeselectHandler
 {

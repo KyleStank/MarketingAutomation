@@ -1,8 +1,6 @@
-using System;
-using System.IO;
 using BepInEx;
 
-namespace MarketingAutomation;
+namespace MarketingAutomation.Persistence;
 
 internal static class PersistenceDiagnostics
 {
@@ -17,7 +15,7 @@ internal static class PersistenceDiagnostics
         }
         catch (Exception logError)
         {
-            MarketingAutomation.Logger.LogWarning($"Unable to retain Marketing IO diagnostics: {logError.Message}");
+            MarketingAutomationPlugin.Logger.LogWarning($"Unable to retain Marketing IO diagnostics: {logError.Message}");
         }
     }
 }

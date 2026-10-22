@@ -1,7 +1,7 @@
-using System;
 using System.Runtime.Serialization;
+using MarketingAutomation.UI;
 
-namespace MarketingAutomation;
+namespace MarketingAutomation.Persistence;
 
 [DataContract]
 internal sealed class ProductIdentity : IEquatable<ProductIdentity>

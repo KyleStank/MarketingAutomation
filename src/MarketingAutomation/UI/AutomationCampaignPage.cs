@@ -1,9 +1,10 @@
-using System;
-using System.Collections.Generic;
+using MarketingAutomation.Automation;
+using MarketingAutomation.GameIntegration;
+using MarketingAutomation.UI.Controls;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace MarketingAutomation;
+namespace MarketingAutomation.UI;
 
 // Draft configuration. Native campaign menus remain untouched and are never initialized.
 public sealed class AutomationCampaignPage : MonoBehaviour

@@ -1,7 +1,7 @@
-using System.Collections.Generic;
+using MarketingAutomation.UI;
 using UnityEngine;
 
-namespace MarketingAutomation;
+namespace MarketingAutomation.GameIntegration;
 
 internal sealed class MarketingProduct
 {

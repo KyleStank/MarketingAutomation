@@ -1,10 +1,9 @@
-using System;
-using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Security.Cryptography;
+using MarketingAutomation.GameIntegration;
 
-namespace MarketingAutomation;
+namespace MarketingAutomation.Persistence;
 
 internal enum SnapshotMatch
 {

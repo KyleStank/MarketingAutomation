@@ -1,6 +1,7 @@
 using System.Globalization;
+using MarketingAutomation.Persistence;
 
-namespace MarketingAutomation;
+namespace MarketingAutomation.GameIntegration;
 
 internal static class NativeCampaignProgress
 {

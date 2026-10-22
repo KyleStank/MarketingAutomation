@@ -1,10 +1,9 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.IO;
+using MarketingAutomation.Automation;
+using MarketingAutomation.GameIntegration;
 using UnityEngine;
 
-namespace MarketingAutomation;
+namespace MarketingAutomation.Persistence;
 
 internal sealed class QueueSaveCheckpoint
 {
@@ -76,7 +75,7 @@ internal static class QueuePersistence
         catch (Exception exception)
         {
             state.CaptureError = exception;
-            MarketingAutomation.Logger.LogError($"Unable to capture Marketing queues: {exception}");
+            MarketingAutomationPlugin.Logger.LogError($"Unable to capture Marketing queues: {exception}");
             PersistenceDiagnostics.Record($"Capture failed for slot {slot}.", exception);
         }
         finally
@@ -117,11 +116,11 @@ internal static class QueuePersistence
             }
 
             Store(state.Path).Publish(state.Path, state.Snapshot);
-            MarketingAutomation.Logger.LogInfo($"Saved {state.Snapshot.Rooms.Length} active Marketing queues for slot snapshot {System.IO.Path.GetFileName(state.Path)}.");
+            MarketingAutomationPlugin.Logger.LogInfo($"Saved {state.Snapshot.Rooms.Length} active Marketing queues for slot snapshot {System.IO.Path.GetFileName(state.Path)}.");
         }
         catch (Exception exception)
         {
-            MarketingAutomation.Logger.LogError($"The native game saved, but Marketing queue data could not be saved: {exception}");
+            MarketingAutomationPlugin.Logger.LogError($"The native game saved, but Marketing queue data could not be saved: {exception}");
             PersistenceDiagnostics.Record($"Checkpoint publication failed for {state.Path}.", exception);
             Notify(save, "The game was saved, but its Marketing automation settings could not be saved. " +
                 "Automation may not resume when this save is loaded. Check the plugin log for details.");
@@ -141,7 +140,7 @@ internal static class QueuePersistence
                         catch (Exception exception)
                         {
                             queue.Stop("Save cleanup failed.");
-                            MarketingAutomation.Logger.LogError($"Marketing queue save cleanup failed: {exception}");
+                            MarketingAutomationPlugin.Logger.LogError($"Marketing queue save cleanup failed: {exception}");
                             PersistenceDiagnostics.Record("Queue cleanup after saving failed.", exception);
                         }
                     }
@@ -167,7 +166,7 @@ internal static class QueuePersistence
         }
         catch (Exception exception)
         {
-            MarketingAutomation.Logger.LogWarning($"Marketing automation data is unavailable for this load: {exception}");
+            MarketingAutomationPlugin.Logger.LogWarning($"Marketing automation data is unavailable for this load: {exception}");
             PersistenceDiagnostics.Record($"Checkpoint read failed for slot {slot}.", exception);
             return new QueueLoadCheckpoint { Match = SnapshotMatch.Damaged };
         }
@@ -185,7 +184,7 @@ internal static class QueuePersistence
         {
             if (state.Match == SnapshotMatch.Missing)
             {
-                MarketingAutomation.Logger.LogInfo("No matching Marketing automation snapshot. Native paid campaigns remain unchanged.");
+                MarketingAutomationPlugin.Logger.LogInfo("No matching Marketing automation snapshot. Native paid campaigns remain unchanged.");
                 return;
             }
             if (state.Match != SnapshotMatch.Matched)
@@ -227,11 +226,11 @@ internal static class QueuePersistence
                 catch (Exception exception)
                 {
                     failed++;
-                    MarketingAutomation.Logger.LogWarning($"Marketing queue for room {record.RoomId} was not restored: {exception.Message}");
+                    MarketingAutomationPlugin.Logger.LogWarning($"Marketing queue for room {record.RoomId} was not restored: {exception.Message}");
                     PersistenceDiagnostics.Record($"Room {record.RoomId} restoration failed for {state.Path}.", exception);
                 }
             }
-            MarketingAutomation.Logger.LogInfo($"Restored {restored} Marketing queues without purchasing campaigns; {failed} could not be matched.");
+            MarketingAutomationPlugin.Logger.LogInfo($"Restored {restored} Marketing queues without purchasing campaigns; {failed} could not be matched.");
             if (failed > 0)
             {
                 Notify(save, "Some Marketing automation could not be matched to this save and was left off. " +
@@ -240,7 +239,7 @@ internal static class QueuePersistence
         }
         catch (Exception exception)
         {
-            MarketingAutomation.Logger.LogWarning($"Marketing automation was not restored: {exception}");
+            MarketingAutomationPlugin.Logger.LogWarning($"Marketing automation was not restored: {exception}");
             PersistenceDiagnostics.Record($"Restoration failed for {state.Path}; snapshot match={state.Match}.", exception);
             Notify(save, "Marketing automation was not restored because its saved settings are missing, damaged, or conflicting. " +
                 "Existing paid campaigns are unchanged. Configure automation again to continue.");

@@ -1,9 +1,7 @@
-using System;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace MarketingAutomation;
+namespace MarketingAutomation.UI.Controls;
 
 // Copy visual components explicitly. Instantiating native menu/row scripts would
 // also copy purchase callbacks, localization writers, and destructive OnDisable logic.

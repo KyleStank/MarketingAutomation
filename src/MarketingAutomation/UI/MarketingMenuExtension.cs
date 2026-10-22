@@ -1,10 +1,9 @@
-using System;
-using System.Collections.Generic;
+using MarketingAutomation.UI.Controls;
 using UnityEngine;
 using UnityEngine.UI;
 using Object = UnityEngine.Object;
 
-namespace MarketingAutomation;
+namespace MarketingAutomation.UI;
 
 // One component per native picker; the native Init call refreshes its room on every opening.
 public sealed class MarketingMenuExtension : MonoBehaviour
@@ -41,14 +40,14 @@ public sealed class MarketingMenuExtension : MonoBehaviour
                 picker = menu;
                 Instances.Add(this);
                 Build();
-                MarketingAutomation.Logger.LogInfo("Automation entry and panel created for the Marketing picker.");
+                MarketingAutomationPlugin.Logger.LogInfo("Automation entry and panel created for the Marketing picker.");
             }
         }
         catch (Exception exception)
         {
             failed = true;
             Cleanup();
-            MarketingAutomation.Logger.LogError($"Automation UI unavailable; native Marketing choices retained: {exception}");
+            MarketingAutomationPlugin.Logger.LogError($"Automation UI unavailable; native Marketing choices retained: {exception}");
         }
     }
 
@@ -114,7 +113,7 @@ public sealed class MarketingMenuExtension : MonoBehaviour
         }
         catch (Exception exception)
         {
-            MarketingAutomation.Logger.LogError($"Unable to open Automation product catalog: {exception}");
+            MarketingAutomationPlugin.Logger.LogError($"Unable to open Automation product catalog: {exception}");
             return;
         }
         RestoreShortcuts();
@@ -131,7 +130,7 @@ public sealed class MarketingMenuExtension : MonoBehaviour
         }
         soundEffects?.PlaySound(3, true);
         menuManager.ActivateMenu(panel);
-        MarketingAutomation.Logger.LogInfo($"Opened Automation for Marketing room {room.myID}.");
+        MarketingAutomationPlugin.Logger.LogInfo($"Opened Automation for Marketing room {room.myID}.");
     }
 
     private void Back()

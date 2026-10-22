@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace MarketingAutomation;
+namespace MarketingAutomation.UI.Controls;
 
 // Compose fresh controls from native visual properties, avoiding serialized game listeners.
 internal static class UiFactory

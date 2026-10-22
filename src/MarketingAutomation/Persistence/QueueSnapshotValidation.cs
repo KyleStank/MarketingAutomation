@@ -1,7 +1,6 @@
-using System;
-using System.Collections.Generic;
+using MarketingAutomation.Automation;
 
-namespace MarketingAutomation;
+namespace MarketingAutomation.Persistence;
 
 internal static class QueueSnapshotValidation
 {

@@ -1,4 +1,6 @@
-namespace MarketingAutomation;
+using MarketingAutomation.Automation;
+
+namespace MarketingAutomation.UI;
 
 internal readonly struct ProductSortValue
 {

@@ -1,6 +1,4 @@
-using System;
-
-namespace MarketingAutomation;
+namespace MarketingAutomation.GameIntegration;
 
 internal sealed class NativeCampaignOption
 {
