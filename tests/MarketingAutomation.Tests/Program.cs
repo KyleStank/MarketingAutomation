@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using MarketingAutomation;
+using MarketingAutomation.Automation;
+using MarketingAutomation.UI;
 
-QueueSchedulerChecks.Run();
-ProductListSortingChecks.Run();
-QueuePersistenceChecks.Run();
-NativeCampaignProgressChecks.Run();
+QueueSchedulerTests.Run();
+ProductListSortingTests.Run();
+QueuePersistenceTests.Run();
+NativeCampaignProgressTests.Run();
 
 var game = new ProductKey(ProductKind.Game, 42, 1001);
 var console = new ProductKey(ProductKind.Console, 42, 2001);
@@ -120,33 +121,32 @@ form.OpenPage(AutomationPage.Products);
 form.OpenPage(AutomationPage.Campaign);
 Check(campaign.SelectedCampaign == 0 && campaign.Threshold == 9, "Page navigation preserves campaign and threshold choices.");
 Check(AutomationFormState.Validate(1, campaign.HasSelection) == AutomationValidation.None,
-    "Selecting a product and unlocked campaign enables the success-preview path.");
+    "Selecting a product and unlocked campaign enables queue confirmation.");
 campaign.Reset();
 Check(!campaign.HasSelection && campaign.Threshold == null, "Closing/reopening discards the campaign draft as well.");
 campaign.Select(0, 15, unlocked: true);
 Check(campaign.Threshold == 15, "A new form defaults its first campaign threshold to the cap again.");
 Check(campaign.Priority == QueuePriority.Hype && campaign.Direction == QueueDirection.Ascending,
     "A new form defaults to Hype / Ascending.");
-Check(campaign.PriorityExplanation.Contains("10 before 85"), "Hype ascending explains lower hype first.");
+Check(QueuePriorityText.Describe(campaign.Priority, campaign.Direction).Contains("10 before 85"), "Hype ascending explains lower hype first.");
 campaign.SetPriority(QueuePriority.Hype, QueueDirection.Descending);
-Check(campaign.PriorityExplanation.Contains("85 before 10"), "Hype descending explains higher hype first.");
+Check(QueuePriorityText.Describe(campaign.Priority, campaign.Direction).Contains("85 before 10"), "Hype descending explains higher hype first.");
 campaign.SetPriority(QueuePriority.Name, QueueDirection.Ascending);
-Check(campaign.PriorityExplanation.Contains("A to Z") && campaign.PrioritySummary == "Name / Ascending",
+Check(QueuePriorityText.Describe(campaign.Priority, campaign.Direction).Contains("A to Z"),
     "Name ascending explains alphabetical queue priority.");
 campaign.SetPriority(QueuePriority.Name, QueueDirection.Descending);
-Check(campaign.PriorityExplanation.Contains("Z to A"), "Name descending explains reverse alphabetical queue priority.");
+Check(QueuePriorityText.Describe(campaign.Priority, campaign.Direction).Contains("Z to A"), "Name descending explains reverse alphabetical queue priority.");
 campaign.SetPriority(QueuePriority.ReleaseDate, QueueDirection.Ascending);
-Check(campaign.PriorityExplanation.Contains("Older releases first"), "Release-date ascending explains older releases first.");
+Check(QueuePriorityText.Describe(campaign.Priority, campaign.Direction).Contains("Older releases first"), "Release-date ascending explains older releases first.");
 campaign.SetPriority(QueuePriority.ReleaseDate, QueueDirection.Descending);
-Check(campaign.PriorityExplanation.Contains("Newer releases first"), "Release-date descending explains newer releases first.");
-Check(campaign.PriorityExplanation.Contains("Ineligible or unaffordable products are skipped") &&
-    campaign.PriorityExplanation.Contains("unless blocked"), "Priority explanation preserves blocker and current-product rules.");
+Check(QueuePriorityText.Describe(campaign.Priority, campaign.Direction).Contains("Newer releases first"), "Release-date descending explains newer releases first.");
+Check(QueuePriorityText.Describe(campaign.Priority, campaign.Direction).Contains("Ineligible or unaffordable products are skipped") &&
+    QueuePriorityText.Describe(campaign.Priority, campaign.Direction).Contains("unless blocked"), "Priority explanation preserves blocker and current-product rules.");
 campaign.Select(5, 100, unlocked: true);
 form.OpenPage(AutomationPage.Products);
 form.OpenPage(AutomationPage.Campaign);
 Check(campaign.Priority == QueuePriority.ReleaseDate && campaign.Direction == QueueDirection.Descending,
     "Campaign selection and page navigation preserve queue-priority choices.");
-Check(campaign.PrioritySummary == "Release Date / Descending", "The success preview summarizes the current combo.");
 campaign.Reset();
 Check(campaign.Priority == QueuePriority.Hype && campaign.Direction == QueueDirection.Ascending,
     "Closing/reopening resets the queue-priority default.");

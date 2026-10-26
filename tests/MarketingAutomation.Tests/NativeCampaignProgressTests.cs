@@ -1,8 +1,8 @@
 using System;
 using System.Globalization;
-using MarketingAutomation;
+using MarketingAutomation.GameIntegration.Marketing;
 
-internal static class NativeCampaignProgressChecks
+internal static class NativeCampaignProgressTests
 {
     internal static void Run()
     {

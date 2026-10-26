@@ -9,14 +9,14 @@
   "summary": "Current project target/references, plugin startup/fallback/teardown and configuration/deployment scripts, separated from generic game and loader behavior.",
   "domains": ["modding", "deployment", "compatibility"],
   "keywords": ["build", "netstandard2.1", "BepInEx.Core", "HarmonyX", "DeployToGame", "initialize", "config", "plugin GUID", "MVID", "UnpatchSelf"],
-  "symbols": ["MarketingAutomation.MarketingAutomationPlugin", "PluginMetadata", "QueueIntegration.Install", "DeployPlugin", "Get-ProjectLocalConfig", "Assert-BepInExInstallation"],
+  "symbols": ["MarketingAutomation.MarketingAutomationPlugin", "PluginMetadata", "QueueIntegration.Install", "QueuePersistenceIntegration.Install", "DeployPlugin", "Get-ProjectLocalConfig", "Assert-BepInExInstallation"],
   "source_sets": ["marketing-automation-implementation", "mgt2-toolchain", "mgt2-runtime"],
   "related": [
     {"id": "runtime-and-source-identity", "relationship": "Native player/module identity bounds applicability of startup checks."},
     {"id": "loader-and-patching-boundaries", "relationship": "Third-party plugin and patch ownership behavior."},
     {"id": "configuration-ui", "relationship": "UI extension attached by the menu Init postfix."},
     {"id": "queue-and-room-integration", "relationship": "Queue hooks installed during bootstrap and removed on destruction."},
-    {"id": "persistence-and-recovery", "relationship": "Save/load hooks are installed through QueueIntegration."}
+    {"id": "persistence-and-recovery", "relationship": "Save/load hooks are installed through QueuePersistenceIntegration."}
   ],
   "created": "2026-10-22",
   "updated": "2026-10-26",
@@ -45,7 +45,8 @@ These are Marketing Automation integration findings. Generic setup belongs to th
 - `src/MarketingAutomation/MarketingAutomationPlugin.cs`: BepInPlugin, `Awake`, fallback and `OnDestroy`.
 - `src/MarketingAutomation/GameIntegration/MarketingMenuIntegration.cs`: `Install(Harmony)` and `PatchInitializeMenu`.
 - `src/MarketingAutomation/PluginMetadata.cs:3-8`: explicit identity/version constants.
-- `src/MarketingAutomation/GameIntegration/QueueIntegration.cs:12-42`: game hook registration.
+- `src/MarketingAutomation/GameIntegration/QueueIntegration.cs`, `Install`: task/room hook registration.
+- `src/MarketingAutomation/GameIntegration/QueuePersistenceIntegration.cs`, `Install`: save/load/preference hook registration.
 - `tools/mgt2-mod-toolkit/scripts/project-config.ps1`, `tools/mgt2-mod-toolkit/initialize.ps1`, `scripts/deploy.ps1:1-37`, and their shell equivalents:
   inspect the checked-in scripts for exact platform-specific behavior before running them.
 - The existing generated `src/MarketingAutomation/obj/project.assets.json` resolves BepInEx.Core 5.4.21 and
@@ -57,9 +58,10 @@ the current restore graph is not a description of the DLL selected by the game's
 ## Architecture and State Ownership
 
 `MarketingAutomationPlugin : BaseUnityPlugin` lives in namespace `MarketingAutomation`. It owns a Harmony instance,
-records its logger, installs the additive Marketing menu hook, and delegates native task/room/save hooks to
-`GameIntegration.QueueIntegration`. Current startup installs the menu hook through
-`GameIntegration.MarketingMenuIntegration`; both adapters extend `BaseIntegration`.
+records its logger, installs the additive Marketing menu hook, and delegates native task/room hooks to
+`GameIntegration.QueueIntegration` and save/load/preference hooks to `GameIntegration.QueuePersistenceIntegration`.
+Current startup installs the menu hook through `GameIntegration.MarketingMenuIntegration`;
+all three adapters extend `BaseIntegration`.
 `PluginMetadata` owns the BepInEx identity constants.
 
 The build project owns references and deployment invocation; the toolkit owns initialization/config parsing. Local `.config.local` owns only two literal absolute
@@ -77,7 +79,7 @@ Runtime startup traced in source:
 2. It reads the gameplay assembly's `ManifestModule.ModuleVersionId`, logs Unity and loader/Harmony versions,
    and warns on an unexpected MVID, then continues.
 3. It creates a Harmony owner using `PluginMetadata.Id` and installs `MarketingMenuIntegration` and
-   `QueueIntegration` through `InstallIntegration<T>()` / `BaseIntegration.Install(Harmony)`.
+   `QueueIntegration` and `QueuePersistenceIntegration` through `InstallIntegration<T>()` / `BaseIntegration.Install(Harmony)`.
 4. `MarketingMenuIntegration.Install` resolves declared `Menu_Marketing_Main.Init(roomScript)`, verifies
    a void return and patches its postfix `PatchInitializeMenu` to add/bind the picker extension.
 5. Any exception enters the catch, unpatches that owner and logs `MarketingAutomation failed to load: <exception>`.
@@ -162,8 +164,9 @@ Initialization options and reference preparation are documented in the [toolkit 
 
 Native runtime identity and loader API semantics are reusable research. This integration selects particular
 compile inputs, startup checks and deployment side effects. The menu extension connects to [configuration UI](configuration-ui.md).
-`QueueIntegration.Install` connects to [queue/room behavior](queue-and-room-integration.md) and
-[persistence](persistence-and-recovery.md), which own the detailed native hook scopes.
+`QueueIntegration.Install` connects to [queue/room behavior](queue-and-room-integration.md), and
+`QueuePersistenceIntegration.Install` connects to [persistence](persistence-and-recovery.md).
+Those reports own the detailed native hook scopes.
 
 ## Mod Integration Implications
 
@@ -187,6 +190,6 @@ for the attributed gameplay baseline. Source/package inspection does not establi
 
 For a startup smoke check, use a disposable single-player session and inspect
 `game_directory` + `BepInEx/LogOutput.log` for MVID/Unity/loader/Harmony reporting and
-`MarketingAutomation finished loading.` after both integration installs. Exercise failure and teardown
+`MarketingAutomation finished loading.` after all three integration installs. Exercise failure and teardown
 separately; successful startup alone does not validate those branches. Follow the relevant UI, queue or
 persistence report for changed integration behavior.

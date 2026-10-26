@@ -9,7 +9,7 @@
   "project": "MarketingAutomation",
   "domains": ["marketing", "automation", "rooms", "integration"],
   "keywords": ["queue", "inclusive threshold", "admission", "cash-only", "cap maintenance", "Stop Automation", "Waiting for eligible products", "dormant waiter", "Support", "ownership", "deferred completion", "task transfer", "selected products"],
-  "symbols": ["MarketingQueue", "QueueScheduler.Choose", "QueueTaskOwnership", "MarketingQueue.StartCampaign", "MarketingQueue.LateUpdate", "MarketingQueue.Stop", "MarketingQueue.Detach", "QueueIntegration.Install", "QueueIntegration.BeforeRoomPanelsPruned", "QueueIntegration.BeforeCancelConfirmed", "MarketingProduct.CanMarket", "NativeCampaignCatalog.Read"],
+  "symbols": ["MarketingQueue", "QueueScheduler.Choose", "QueueTaskOwnership", "MarketingQueue.PurchaseAndBindCampaign", "MarketingQueue.LateUpdate", "MarketingQueue.Stop", "MarketingQueue.StopAfterTaskReplacement", "QueueIntegration.Install", "QueueIntegration.BeforeRoomPanelsPruned", "QueueIntegration.BeforeCancelConfirmed", "MarketingProduct.CanMarket", "NativeCampaignCatalog.Read", "MarketingQueue.DispatchNextCampaignOrWait", "MarketingQueue.ReconcileTaskBeforeDispatch", "NativeMarketingTasks.PurchaseCampaign", "QueueSnapshotCapture.Capture", "QueuePersistenceIntegration.Install", "ProductKey", "NativeRoomControls", "NativeMarketingRoomWindow", "NativeWaitingRoomWindow", "QueueRoomPresentation", "MarketingQueueRegistry"],
   "source_sets": ["marketing-automation-implementation", "mgt2-managed"],
   "related": [
     {"id": "configuration-ui", "relationship": "Owns confirmed copied form configuration and independent display sorting."},
@@ -40,7 +40,7 @@
 
 Room-local scheduling, native paid-task creation, dormant Waiting, ownership adapters and
 Support integration. [Scheduling and control policy](../../docs/behavior.md#scheduling)
-defines intended behavior. This report describes the source inspected on 2026-10-22,
+defines intended behavior. This report describes the implementation statically reviewed on 2026-10-26,
 including the transferred-waiter discrepancy in F-005 and pause qualifications in F-006.
 UI composition belongs to [configuration-ui](configuration-ui.md); exact save matching belongs to
 [persistence-and-recovery](persistence-and-recovery.md).
@@ -48,24 +48,36 @@ UI composition belongs to [configuration-ui](configuration-ui.md); exact save ma
 ## Source References and Applicability
 
 Source set `marketing-automation-implementation` in [SOURCES.yaml](../SOURCES.yaml) locates the project sources. The implementation
-was inspected on 2026-10-22. Verify named methods if later edits move the cited lines.
+was statically reviewed on 2026-10-26. Named methods identify the current responsibilities;
+this review does not establish new in-game observations.
 Native premises use `mgt2-managed` from the [shared registry](../../tools/mgt2-mod-toolkit/research/SOURCES.yaml).
 
 `M/` below means `src/MarketingAutomation/`. Primary code:
 
 | Path | Responsibility and inspected boundary |
 | --- | --- |
-| `M/Automation/MarketingQueue.cs:12-513` | Room-local component, live task ownership, scheduling/binding, Stop and save/load handoff |
-| `M/Automation/QueueScheduler.cs:43-143` | Pure current-admission/candidate/cash/cap/priority decision |
-| `M/Automation/CampaignConfiguration.cs:3-23` | Stable persisted priority values and explicit UI index mapping |
-| `M/GameIntegration/QueueIntegration.cs:10-205` | Harmony task/room/status/control and persistence adapters |
-| `M/GameIntegration/MarketingProduct.cs:7-110` | Live native references, runtime typed key, marketability and release-date inputs |
-| `M/GameIntegration/NativeCampaignCatalog.cs:15-59` | Live arrays, prices/work/cap/gain validation and unlocks |
-| `M/UI/ProductSelection.cs:3-40` | ProductKind and runtime ProductKey including instance ID |
+| `M/Automation/Runtime/MarketingQueue.cs` | Room-local component, live task ownership, scheduling/binding, Stop and save/load handoff |
+| `M/Automation/Runtime/MarketingQueueRegistry.cs` | Active queue membership, global shutdown and save/load enumeration |
+| `M/Automation/QueueScheduler.cs` | Pure current-admission/candidate/cash/cap/priority decision |
+| `M/Automation/QueueOrdering.cs` | Stable persisted priority and direction enum values |
+| `M/UI/ProductSortOptions.cs` | Explicit dropdown display/index mapping |
+| `M/GameIntegration/QueueIntegration.cs` | Harmony ownership/eligibility guards and task/room callbacks |
+| `M/UI/QueueRoomPresentation.cs` | Queue room captions, indicators, waiting menu, restored window/icon and automation control label |
+| `M/GameIntegration/QueuePersistenceIntegration.cs` | Harmony save/load and load-preference adapters |
+| `M/GameIntegration/UI/NativeRoomControls.cs` | Named live access to roomButtonScript controls, context panels and window slots |
+| `M/GameIntegration/UI/NativeMarketingRoomWindow.cs` | Named Marketing roomWindow indicator and hype-wait warning icon |
+| `M/GameIntegration/UI/NativeWaitingRoomWindow.cs` | Named generic Waiting roomWindow status text and icon |
+| `M/GameIntegration/Marketing/NativeMarketingTasks.cs` | Native paid task purchase, initialization and dormant waiter creation |
+| `M/Persistence/QueueSnapshotCapture.cs` | Live queue data converted into the unchanged checkpoint schema |
+| `M/Automation/Runtime/QueueTaskOwnership.cs` | Unity task ownership marker |
+| `M/Automation/QueueCandidate.cs` | Selected product inputs for an unpaid scheduling decision |
+| `M/GameIntegration/Marketing/MarketingProduct.cs` | Live native references, runtime typed key, marketability and release-date inputs |
+| `M/GameIntegration/Marketing/NativeCampaignCatalog.cs` | Live arrays, prices/work/cap/gain validation and unlocks |
+| `M/Automation/ProductKey.cs` | ProductKind and runtime ProductKey including instance ID |
 
 ## Architecture and State Ownership
 
-`MarketingQueue : MonoBehaviour` attaches to the native room object. It stores room/GUI references,
+`MarketingQueue : MonoBehaviour` in `Automation.Runtime` attaches to the native room object. It stores room/GUI references,
 a copied list of `MarketingProduct` wrappers, typed persistent selection identities, one `QueueScheduler`,
 campaign index and one bound native task object/ID. `Running` and `Configured` are different: after Stop
 the paid native task can survive although scheduler/configuration have been cleared.
@@ -73,15 +85,30 @@ the paid native task can survive although scheduler/configuration have been clea
 The pure scheduler stores threshold, priority, direction and a nullable admitted `ProductKey`.
 The runtime key combines product kind, native ID and Unity instance ID. Instance identity prevents a
 replacement object from inheriting live selection just because a numeric ID is reused; it is not a save
-key. External snapshots use typed persistent identities and reconstruct live references separately.
+key. `ProductKey` and `ProductKind` belong to Automation rather than UI. External snapshots use typed
+persistent identities and reconstruct live references separately.
+
+`NativeMarketingTasks` in `GameIntegration.Marketing` owns native task construction and payment,
+while `MarketingQueue` retains task
+binding, completion observation and lifetime decisions. `QueueSnapshotCapture.Capture` maps live data to
+the existing checkpoint schema; queue eligibility and save suspension remain `MarketingQueue` responsibilities.
+`QueuePersistenceIntegration` owns save/load hooks and the silent load-preference seed, separately registered
+by the plugin. `QueueIntegration` owns Harmony eligibility/ownership decisions and return semantics;
+`UI.QueueRoomPresentation` owns room captions, indicators, context-menu presentation, restored-window
+styling and automation labels after those guards pass. `NativeRoomControls` and the room-window bindings
+live in `GameIntegration.UI`. `NativeRoomControls` owns the slot mapping for `roomButtonScript`;
+the two room-window wrappers distinguish Marketing and generic Waiting layouts
+of the same native `roomWindow` type. They resolve current entries on access, without caching prefab children.
 
 `QueueTaskOwnership` is attached to every newly bound/adopted owned task. `ForTask(Component)` resolves
-the marker and checks the owner still has that object and matching room task ID (`MarketingQueue.cs:40-51`).
-`Bind(GameObject,int)` records bound object/ID, resets completion state, adds the marker, and replaces
-**both** `room.taskID` and `room.taskGameObject` (`:244-252`). The marker owns no saved configuration.
+the marker and checks the owner still has that object and matching room task ID (`MarketingQueue.cs`).
+`BindOwnedTask(GameObject,int)` records bound object/ID, resets completion state, adds the marker, and replaces
+**both** `room.taskID` and `room.taskGameObject`. The marker owns no saved configuration.
 
-Static `Instances` supports shutdown and persistence enumeration. There is no global selected-product
-reservation or shared campaign scheduler: each room's queue makes independent decisions using shared
+`MarketingQueueRegistry` owns the active queue set and operations that enumerate it for shutdown,
+load cleanup, capture or save suspension. Individual queues keep their task-lifetime guards and state
+transitions. Destructive registry operations enumerate a copy because Stop unregisters queues.
+There is no global selected-product reservation or shared campaign scheduler: each room's queue makes independent decisions using shared
 native product hype. The current implementation explicitly rejects multiplayer startup.
 
 ## Behavior and Call Flows
@@ -89,18 +116,19 @@ native product hype. The current implementation explicitly rejects multiplayer s
 ### Selection, admission and current-product retention
 
 `TryStart(...)` rejects missing/non-Marketing/multiplayer rooms, busy rooms, empty product lists, or an
-invalid/locked campaign (`MarketingQueue.cs:53-85`). It reads native arrays before committing, attaches or
+invalid/locked campaign (`MarketingQueue.cs`). It reads native arrays before committing, attaches or
 reuses a queue component, copies the selected list, captures persistent identities and clamps threshold
-to 0..cap. It sets Running, registers the instance and **immediately calls Scan** (`:86-103`).
+to 0..cap. It sets Running, registers the instance and **immediately calls DispatchNextCampaignOrWait**.
 This initial user-confirmation scan is not gated by the later background pause/game-delta checks.
 
-`Scan()` rereads current campaign data, excludes vanished wrapper objects, and builds candidates with
-current hype/name/date, separate product-type price, unlock and `CanMarket(companyId)`
-(`:157-190`). `MarketingProduct.CanMarket` uses native catalog conditions plus the live game-task
+`DispatchNextCampaignOrWait()` rereads current campaign data, excludes vanished wrapper objects, and builds candidates with
+current hype/name/date, separate product-type price, unlock and `CanMarket(companyId)`.
+`MarketingProduct.CanMarket` uses native catalog conditions plus the live game-task
 off-market/positive-sales cancellation boundary; consoles require ownership and non-withdrawal
-(`MarketingProduct.cs:29-43`). This is stricter than merely reproducing the initial catalog list.
+(`MarketingProduct.cs`). This is stricter than merely reproducing the initial catalog list.
 
-`QueueScheduler.Choose(candidates,cash,cap)` (`QueueScheduler.cs:65-99`):
+`QueueScheduler.Choose(candidates,cash,cap)` delegates retained admission to
+`CanContinueAdmittedProduct` and new selection to `FindBestNewAdmission`:
 
 1. If the admitted product still exists and `CanPurchase` holds, retain it even if hype is now above
    the entry threshold or another product would sort ahead.
@@ -109,45 +137,76 @@ off-market/positive-sales cancellation boundary; consoles require ownership and 
    `cash>=price`. Equality cash and threshold are allowed; equality cap is blocked.
 4. Choose the best candidate and record it as admitted. No candidate leaves admission empty.
 
-Comparison uses Name via `.CompareTo` (the normal .NET string comparison semantics), raw hype, or
+`QueueScheduler.ComparePriority` uses Name via `.CompareTo` (the normal .NET string comparison semantics), raw hype, or
 numeric release month. Descending reverses the main comparison. Missing dates are ordered last before
 reversal and thus remain last in both directions. Ties use product kind, native ID and finally runtime
-instance ID (`:101-143`). ReleaseMonth is `year*12+month` only for a valid dated released/non-shelved game
-or unlocked console (`MarketingProduct.cs:35-43`). UI dropdown order is mapped separately from stored
-enum values: ReleaseDate=0, Hype=1, Name=2 (`CampaignConfiguration.cs:3-23`).
+instance ID. ReleaseMonth is `year*12+month` only for a valid dated released/non-shelved game
+or unlocked console (`MarketingProduct.cs`). UI dropdown order is mapped separately from stored
+enum values: ReleaseDate=0, Hype=1, Name=2 (`Automation/QueueOrdering.cs`);
+`UI/ProductSortOptions.cs` maps display indices independently.
 
 ### Paid campaign creation and completion
 
-`StartCampaign(product,option)` gets game/console menu arrays from GUI indices 89/321, chooses the
-appropriate price/work, and rechecks positive work, price/cash and current product marketability
-(`MarketingQueue.cs:201-213`). It creates a native Marketing task and immediately invokes its private
-`FindScripts` by reflection before normal Unity `Start`, destroying the new object if initialization fails
-(`:214-228`). It then initializes native ID, typed target/campaign, all three flags false, points/remaining
-points and cached menu/product references (`:229-237`).
+`MarketingQueue.PurchaseAndBindCampaign(product,option)` calls
+`NativeMarketingTasks.PurchaseCampaign(room,manager,product,campaign,option)`. That factory reads the
+game/console menu arrays at GUI indices 89/321, chooses price/work and rechecks positive work, price/cash,
+and current marketability. `CreateInitializedCampaign` creates a native Marketing task and calls
+`InitializeDependencies`, which invokes private `FindScripts` before Unity `Start`; initialization failure
+deactivates and destroys the new object before rethrowing.
 
-Only then it calls `Pay(price,12)`, releases any waiter and binds the new task (`:238-242`). Native workers
-and Support do normal PR work. Native completion applies hype/accounting and requests destruction because
-A=false; `QueueIntegration.AfterCampaignCompleted` observes that completion and records the frame
-(`QueueIntegration.cs:45`; `MarketingQueue.Completed():254-260`). It does **not** purchase inside completion.
+The factory initializes native ID, typed target/campaign, all three flags false, points/remaining points
+and cached menu/product references. Only then it calls `Pay(price,12)` and returns the task. The queue
+removes any waiter and binds the new task. Native workers and Support do normal PR work. Native completion
+applies hype/accounting and requests destruction because A=false. `QueueIntegration.AfterCampaignCompleted`
+calls `MarketingQueue.RecordCampaignCompletion`, which records the frame and resets the scan timer.
+It does **not** purchase inside completion.
 
-`LateUpdate()` first reconciles bound IDs/objects. A still-live paid task returns without scanning. An
-object that disappears after a recorded completion clears binding and permits another scan; disappearance
-without completion stops the queue. This waits for Unity's destroyed-object state instead of assuming
-other employees no longer hold this frame's task (`MarketingQueue.cs:106-136`). Paid work is never
-preempted just because another room raises hype or a higher-priority candidate appears.
+`MarketingQueue.LateUpdate` first calls `ReconcileTaskBeforeDispatch` to reconcile bound IDs/objects.
+A still-live paid task prevents dispatch. An object that disappears after a recorded completion clears
+binding and permits another scan; disappearance without completion stops the queue. This waits for
+Unity's destroyed-object state instead of assuming other employees no longer hold this frame's task.
+Paid work is never preempted just because another room raises hype or a higher-priority candidate appears.
 
 Background dispatch then checks Running, multiplayer, own-room pause, native loading state and positive
 game delta. Its timer uses `mainScript.GetDeltaTime()` and scans approximately each accumulated game
-second while waiting, or immediately when unbound (`:137-150`). Exceptions Stop the queue, retain paid work
-where applicable, and log diagnostics (`:151-155`).
+second while waiting, or immediately when unbound. Exceptions Stop the queue, retain paid work where
+applicable, and log diagnostics.
 
 ### Waiting, presentation, context and Support
 
-When no candidate is available and there is no bound task, `CreateWaiter()` calls native AddTask_Wait,
-initializes it, sets `art=-1` and binds it (`MarketingQueue.cs:192-199`). Native art -1 returns before QA
-dispatch; it produces no campaign/hype. Own-room generic waiter gates suppress employee work independently.
+When no candidate is available and there is no bound task, `MarketingQueue.CreateWaitingTask` calls
+`NativeMarketingTasks.CreateWaitingTask`, which calls native AddTask_Wait, initializes it and sets `art=-1`.
+The queue binds the result. Native art -1 returns before QA dispatch; it produces no campaign/hype. Own-room generic waiter gates suppress employee work independently.
 
-The adapters address separate native gaps (`QueueIntegration.cs:53-129`):
+The slot wrappers were checked against `reference/decompiled/Assembly-CSharp/roomButtonScript.cs`
+(`RemoveMenus`, `BUTTON_Main`), `roomScript.cs` (`UpdateWindowWait`), and `roomWindow.cs`
+(`Window_Wait`, `Window_Marketing`), plus the reconstructed
+`reference/extracted_unity_project/ExportedProject/Assets/GameObject/uiRoom.prefab` bindings.
+The installed Assembly-CSharp SHA-256 matches the recorded decompilation input. These source/prefab checks
+do not establish runtime behavior.
+
+| Wrapper member | Native owner/slot | Reconstructed prefab binding |
+| --- | --- | --- |
+| `NativeRoomControls.SharedRoomOptions` | roomButtonScript uiObjects[2] | RoomDefaultOptions, GameObject 1330820015962899 |
+| `NativeRoomControls.ActiveMarketingOptions` | roomButtonScript uiOptions[12] | OptionenMarketingAktiv (active Marketing options), GameObject 1447409744879641 |
+| `NativeRoomControls.MarketingStatusWindow` | roomButtonScript uiWindows[4] | Window_Marketing, GameObject 1533803739292891 |
+| `NativeRoomControls.WaitingStatusWindow` | roomButtonScript uiWindows[26] | Window_Wait, GameObject 1094283985748868 |
+| `NativeMarketingRoomWindow.AutomationIndicator` | Marketing roomWindow uiObjects[4] | IconAuto, GameObject 1240571728440943 |
+| `NativeMarketingRoomWindow.HypeWaitingWarningIcon` | Marketing roomWindow uiObjects[5], child Icon | Message, GameObject 1617365563186364; Icon child 1408345039935966 |
+| `NativeWaitingRoomWindow.StatusText` | Waiting roomWindow uiObjects[0] | Text, GameObject 1433881075115309 |
+| `NativeWaitingRoomWindow.StatusIcon` | Waiting roomWindow uiObjects[1] | Icon, GameObject 1838352681112328 |
+
+`HasWaitingWindowSlot` retains the native-array null/length guard. `WaitingStatusWindow` reads and writes
+the live array slot, so clearing it before `RemoveMenus` protects the window and restoring it afterwards
+keeps the original binding. The wrappers do not reorder menu callbacks, activation or hierarchy changes.
+
+`QueueIntegration` checks ownership and dispatches presentation to `QueueRoomPresentation`:
+`ShowWaitingStatus`, `ShowCampaignAutomation`, `ToggleWaitingRoomMenu`, `RestoreWaitingStatusWindow`
+and `ShowAutomationControl`. The waiting-menu method captures `wasOpen` before `CloseAllRoomButtons`,
+then updates panel visibility, reparents the shared controls, raises the room UI and applies pause state.
+The ownership checks and native prefix true/false decisions remain in `QueueIntegration`.
+
+The adapters address separate native gaps:
 
 - Before native `RemoveMenus`, temporarily remove window `[26]` from the array; restore it afterwards
   and copy the native Marketing warning sprite into its icon. The guard covers **all initialized
@@ -170,30 +229,31 @@ native uncertainty documented by [room-support](../../tools/mgt2-mod-toolkit/res
 
 `BeforeAutomationToggle` and `BeforeAutomationLabel` act only when an owned marker resolves. Stop calls
 `queue.Stop`, closes the native room menu and unpauses instead of flipping A
-(`QueueIntegration.cs:132-169`). The label is native End Automation while Running; after Stop it becomes
+(`QueueIntegration.cs`). The label is native End Automation while Running; after Stop it becomes
 disabled “Automation stopped” for the surviving owned paid task, preventing resurrection of discarded
 configuration through native Start Automation.
 
 `Stop(string)` sets Running=false, removes an owned waiter, cleans an already-completed bound object,
 nulls products/selection/scheduler, sets campaign=-1 and unregisters the queue. A completed native object
 awaiting destruction is cleaned up separately. An unfinished paid native Marketing task remains intact;
-its A/S/D are false, so it finishes once without another purchase (`MarketingQueue.cs:262-290`).
+its A/S/D are false, so it finishes once without another purchase (`MarketingQueue.cs`).
 
 Native paid cancellation reaches `taskMarketing.Abbrechen`; its prefix Stops the owning queue while
 the original refunds unfinished work and destroys the task. Generic waiter cancellation also has a
 prefix. The generic cancel confirmation lacks a native taskWait dispatch, so `BeforeCancelConfirmed`
 explicitly Stops owned Waiting before the native dispatcher clears the room
-(`QueueIntegration.cs:47-51,171-178`). It is possible for native invalid-target cancellation to use the
+(`QueueIntegration.cs`). It is possible for native invalid-target cancellation to use the
 same Marketing method; the queue stops rather than inferring user intent.
 
-Bound-ID mismatch calls `Detach` and Stops the queue (`MarketingQueue.cs:115-120,292-299`). A transferred
+Bound-ID mismatch calls `StopAfterTaskReplacement` and Stops the queue (`MarketingQueue.cs`). A transferred
 paid task is left to its new room; there is no attempt to refund, move it back or follow it. **Waiter
-qualification:** `Stop -> ReleaseWaiter` deactivates/destroys its bound waiter even after room-ID mismatch;
-`ClearBinding` only clears the old room when its ID still matches (`:301-323`). The implementation therefore
+qualification:** `Stop -> RemoveWaitingTask` deactivates/destroys its bound waiter even after room-ID mismatch;
+`ClearTaskBinding` only clears the old room when its ID still matches. The implementation therefore
 does not establish preservation of a transferred owned waiter; runtime reachability and destination cleanup
 remain unresolved (F-005).
 
-OnDestroy Stops/unregisters the room queue. Global removal Stops all enumerated queues. Task markers
+OnDestroy Stops/unregisters the room queue. `MarketingQueue.RemoveAll` delegates global removal to
+`MarketingQueueRegistry.StopAll`, which Stops and destroys all enumerated queues. Task markers
 are not independent automation controllers and do not retain a configuration preset.
 
 ## Findings and Evidence
@@ -204,7 +264,7 @@ Statement: The current scheduler admits at h<=threshold, purchases only below ca
 Basis: static-observation
 Standing: current
 Applies to: marketing-automation-implementation
-Evidence: `M/Automation/QueueScheduler.cs`, `internal ProductKey? Choose(...):65-95`, `private static bool CanPurchase(...):97-99`; `M/Automation/MarketingQueue.cs`, `private void Scan():157-190`.
+Evidence: `M/Automation/QueueScheduler.cs`, `Choose`, `CanContinueAdmittedProduct`, `FindBestNewAdmission`, `CanPurchase`; `M/Automation/Runtime/MarketingQueue.cs`, `DispatchNextCampaignOrWait`.
 Explanation: This is ongoing cap maintenance, not a finite pass or native A/S/D behavior. A product above threshold remains selected but cannot newly enter. Newly available products are absent from the copied list. Reaching cap or losing affordability/eligibility clears current admission before future selection.
 
 ### F-002 - Each dispatched campaign is one cash-funded native one-shot
@@ -213,7 +273,7 @@ Statement: Dispatch initializes native dependencies and paid task fields, sets A
 Basis: static-observation
 Standing: current
 Applies to: marketing-automation-implementation
-Evidence: `M/Automation/MarketingQueue.cs`, `StartCampaign(MarketingProduct,NativeCampaignOption):201-242`, `Bind(GameObject,int):244-252`, `Completed(taskMarketing):254-260`, `LateUpdate():106-155`; `M/GameIntegration/QueueIntegration.cs:14,45`; native completion report F-001 through F-004.
+Evidence: `M/GameIntegration/Marketing/NativeMarketingTasks.cs`, `PurchaseCampaign`, `CreateInitializedCampaign`, `InitializeDependencies`; `M/Automation/Runtime/MarketingQueue.cs`, `PurchaseAndBindCampaign`, `BindOwnedTask`, `RecordCampaignCompletion`, `LateUpdate`, `ReconcileTaskBeforeDispatch`; `M/GameIntegration/QueueIntegration.cs`, `AfterCampaignCompleted`; native completion report F-001 through F-004.
 Explanation: False automatic avoids native repeat's debit before a postfix could rotate. Immediate FindScripts handles a confirmation occurring before Unity Start. This preserves the native completion accounting asymmetry rather than silently correcting it. Static control flow is not proof of all Unity same-frame ordering.
 
 ### F-003 - Visible Waiting requires coordinated native-room adapters
@@ -222,7 +282,7 @@ Statement: The current mod represents Waiting by an owned art -1 taskWait, retai
 Basis: static-observation
 Standing: current
 Applies to: marketing-automation-implementation
-Evidence: `M/Automation/MarketingQueue.cs`, `CreateWaiter():192-199`; `M/GameIntegration/QueueIntegration.cs`, `BeforeRoomPanelsPruned/AfterRoomPanelsPruned:53-79`, display/room predicate/context adapters `:81-129`; native waiter and room-binding reports.
+Evidence: `M/Automation/Runtime/MarketingQueue.cs`, `CreateWaitingTask`; `M/GameIntegration/Marketing/NativeMarketingTasks.cs`, `CreateWaitingTask`; `M/GameIntegration/QueueIntegration.cs`, `BeforeRoomPanelsPruned`, `AfterRoomPanelsPruned`, `AfterWaitingDisplay`, `BeforeRoomMenu`, `AfterRoomWaitingCheck`, `AfterCampaignDisplay`; `M/UI/QueueRoomPresentation.cs`, `ShowWaitingStatus`, `ShowCampaignAutomation`, `ToggleWaitingRoomMenu`, `RestoreWaitingStatusWindow`; named slot wrappers `M/GameIntegration/UI/NativeRoomControls.cs`, `NativeMarketingRoomWindow.cs`, `NativeWaitingRoomWindow.cs` and the prefab bindings above; native waiter and room-binding reports.
 Explanation: Retention is room-type/single-player scoped before any queue exists; custom text/context is task/queue owned. It is more precise than saying every native patch is limited to an already-owned room. The waiter is excluded from native saves via separate persistence handoff.
 
 ### F-004 - Stop discards configuration while preserving unfinished paid work
@@ -231,16 +291,16 @@ Statement: The owned Stop adapter clears queue settings immediately, removes Wai
 Basis: static-observation
 Standing: current
 Applies to: marketing-automation-implementation
-Evidence: `M/Automation/MarketingQueue.cs`, `internal void Stop(string):262-290`; `M/GameIntegration/QueueIntegration.cs`, `BeforeAutomationToggle:132-146`, `BeforeAutomationLabel:148-169`, cancel prefixes `:47-51,171-178`.
+Evidence: `M/Automation/Runtime/MarketingQueue.cs`, `Stop`; `M/GameIntegration/QueueIntegration.cs`, `BeforeAutomationToggle`, `BeforeAutomationLabel`, `BeforeCampaignCanceled`, `BeforeWaitingCanceled`, `BeforeCancelConfirmed`; `M/UI/QueueRoomPresentation.cs`, `ShowAutomationControl`.
 Explanation: Stop is intentionally different from the unmanaged native A toggle. The native immediate Cancel route still invokes native paid refund. Stopped queue configuration is absent from subsequent active captures; historical snapshots are handled separately by persistence.
 
 ### F-005 - Task replacement stops the queue but transferred waiter cleanup needs runtime review
 
-Statement: A changed room task ID detaches/stops execution and preserves a transferred unfinished paid task, but Stop can deactivate/destroy a bound owned waiter after transfer because ReleaseWaiter has no room-ID ownership guard.
+Statement: A changed room task ID detaches/stops execution and preserves a transferred unfinished paid task, but Stop can deactivate/destroy a bound owned waiter after transfer because RemoveWaitingTask has no room-ID ownership guard.
 Basis: static-observation
 Standing: current
 Applies to: marketing-automation-implementation
-Evidence: `M/Automation/MarketingQueue.cs`, `LateUpdate():115-120`, `Stop():262-290`, `Detach():292-299`, `ReleaseWaiter():301-311`, `ClearBinding():313-323`; native `Menu_Verschiebe_Task.TaskTauschen` in room-binding report.
+Evidence: `M/Automation/Runtime/MarketingQueue.cs`, `ReconcileTaskBeforeDispatch`, `Stop`, `StopAfterTaskReplacement`, `RemoveWaitingTask`, `ClearTaskBinding`; native `Menu_Verschiebe_Task.TaskTauschen` in room-binding report.
 Explanation: This is a statically identified implementation boundary; a fix has not been validated. Runtime reachability and destination cleanup for an owned waiter require targeted review. The intended product policy cannot serve as evidence that this edge already preserves the moved task.
 
 ### F-006 - Background spending gates do not describe initial confirmation or every Support contribution
@@ -249,7 +309,7 @@ Statement: LateUpdate gates dispatch on game delta/loading/room pause, while Try
 Basis: static-observation
 Standing: current
 Applies to: marketing-automation-implementation
-Evidence: `M/Automation/MarketingQueue.cs`, `TryStart(...):86-103`, `LateUpdate():137-150`; native room-support F-003 and Marketing work report F-001.
+Evidence: `M/Automation/Runtime/MarketingQueue.cs`, `TryStart`, `DispatchNextCampaignOrWait`, `LateUpdate`; native room-support F-003 and Marketing work report F-001.
 Explanation: “Pause-aware queue” describes background purchasing, not a blanket claim that no confirmation can buy while a modal pauses the game or that pausing the leader prevents unpaused assistants advancing paid work.
 
 ## Connections to Other Systems
@@ -258,10 +318,14 @@ Explanation: “Pause-aware queue” describes background purchasing, not a blan
   display sorting remain UI responsibilities. Persisted enum values must not be inferred from dropdown order.
 - Live native campaign arrays/unlocks are reread and validated; unequal game/console cap/gain arrays are
   rejected by `NativeCampaignCatalog.Read`, not silently reconciled.
-- `SuspendForSave`, `RestoreAfterSave`, `CaptureActive` and `Restore` bridge persistence. Transient owned
-  waiters/completed tasks are temporarily excluded; paid tasks remain native. Restore adopts matching
-  paid progress or creates an unpaid waiter without buying during load (`MarketingQueue.cs:348-506`).
-  External association and numeric validation belong to the persistence report.
+- `MarketingQueueRegistry.SuspendForSave`, `CaptureActive` and `ClearForLoad` enumerate active queues.
+  `MarketingQueue.SuspendForSave`, `RestoreAfterSave`, `CaptureSnapshot` and `Restore` own individual
+  live-state transitions. Transient owned waiters/completed tasks are temporarily excluded; paid tasks
+  remain native. Restore adopts matching paid progress or creates an unpaid waiter without buying during
+  load. `CanCaptureTaskState` rejects replaced/canceled/transferred ownership, and
+  `QueueSnapshotCapture.Capture` serializes accepted queue data. `QueuePersistenceIntegration` connects
+  native save/load hooks to these handoffs. External association and numeric validation belong to the
+  persistence report.
 - Native user workflows remain available for unmanaged tasks. The patch list's broad target types do not
   imply all instances receive queue behavior; each adapter's actual guards must be inspected.
 
@@ -282,7 +346,7 @@ The user-reported baseline documented with the 2026-10-22 inspection supports fu
 manual persistence observations are recorded once in
 [persistence F-004](persistence-and-recovery.md#f-004---user-acceptance-supports-manual-continuity-within-stated-limits).
 Those observations do not validate subsequent source edits or every ownership/Support edge.
-[QueueSchedulerChecks.cs](../../tests/MarketingAutomation.Checks/QueueSchedulerChecks.cs)
+[QueueSchedulerTests.cs](../../tests/MarketingAutomation.Tests/QueueSchedulerTests.cs)
 owns isolated scheduling cases; it does not execute Unity tasks or Harmony hooks.
 
 - Q-001: Transferred owned waiter handling (F-005) needs runtime reachability and destination-cleanup review.

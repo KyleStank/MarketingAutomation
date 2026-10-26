@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using MarketingAutomation;
+using MarketingAutomation.Automation;
+using MarketingAutomation.GameIntegration.Marketing;
+using MarketingAutomation.UI;
 
-internal static class ProductListSortingChecks
+internal static class ProductListSortingTests
 {
     internal static void Run()
     {
@@ -22,13 +24,13 @@ internal static class ProductListSortingChecks
             {
                 CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture);
                 var alpha = new ProductSortValue(new ProductKey(ProductKind.Console, 10, 100), "Alpha", 10.4f,
-                    ProductListSorting.ReleaseKey(2020, 1, false));
+                    NativeProductOrdering.ReleaseDateKey(2020, 1, false));
                 var beta = new ProductSortValue(new ProductKey(ProductKind.Game, 20, 200), "Beta", 10.49f,
-                    ProductListSorting.ReleaseKey(2020, 12, false));
+                    NativeProductOrdering.ReleaseDateKey(2020, 12, false));
                 var zebra = new ProductSortValue(new ProductKey(ProductKind.Game, 30, 300), "Zebra", 90,
-                    ProductListSorting.ReleaseKey(2021, 1, false));
+                    NativeProductOrdering.ReleaseDateKey(2021, 1, false));
                 var unreleased = new ProductSortValue(new ProductKey(ProductKind.Console, 40, 400), "Unreleased", 0,
-                    ProductListSorting.ReleaseKey(0, 0, true));
+                    NativeProductOrdering.ReleaseDateKey(0, 0, true));
                 var values = new List<ProductSortValue> { zebra, beta, unreleased, alpha };
                 values.Sort((left, right) => ProductListSorting.Compare(left, right, QueuePriority.Name));
                 Require(values.Select(value => value.Name).SequenceEqual(new[] { "Alpha", "Beta", "Unreleased", "Zebra" }),

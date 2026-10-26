@@ -8,45 +8,43 @@ public sealed class SearchInputFocus : MonoBehaviour, ISelectHandler, IDeselectH
 {
     internal GUI_Main MenuManager;
     internal InputField Input;
-    private bool ownsFocus;
-    private bool releasePending;
+    private bool _ownsFocus;
+    private bool _releasePending;
 
-    private void Start() => Input.onEndEdit.AddListener(_ => releasePending = true);
+    private void Start() => Input.onEndEdit.AddListener(_ => _releasePending = true);
 
     public void OnSelect(BaseEventData eventData)
     {
-        ownsFocus = true;
-        releasePending = false;
+        _ownsFocus = true;
+        _releasePending = false;
         MenuManager.SelectInputField();
     }
 
-    public void OnDeselect(BaseEventData eventData) => releasePending = true;
+    public void OnDeselect(BaseEventData eventData) => _releasePending = true;
 
     private void LateUpdate()
     {
         // InputField activates in LateUpdate and can end editing (including Escape)
         // without a selection change. Never release on its initial unfocused frame.
-        if (releasePending)
+        if (_releasePending)
         {
-            Release();
+            ReleaseGameInputFocus();
         }
-        else if (Input.isFocused && !ownsFocus)
+        else if (Input.isFocused && !_ownsFocus)
         {
-            ownsFocus = true;
+            _ownsFocus = true;
             MenuManager.SelectInputField();
         }
     }
 
-    private void Release()
+    private void ReleaseGameInputFocus()
     {
-        if (ownsFocus && MenuManager)
-        {
+        if (_ownsFocus && MenuManager)
             MenuManager.DeselectInputField();
-        }
 
-        ownsFocus = false;
-        releasePending = false;
+        _ownsFocus = false;
+        _releasePending = false;
     }
 
-    private void OnDisable() => Release();
+    private void OnDisable() => ReleaseGameInputFocus();
 }

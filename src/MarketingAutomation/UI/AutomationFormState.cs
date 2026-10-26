@@ -23,8 +23,11 @@ internal sealed class AutomationFormState
     }
 
     internal bool CanGoBack => Page != AutomationPage.Products;
+
     internal bool CanGoForward => Page != AutomationPage.Campaign;
+
     internal void OpenPage(AutomationPage page) => Page = page;
+
     internal void Reset() => Page = AutomationPage.Products;
 
     internal static AutomationValidation Validate(int productCount, bool campaignSelected)

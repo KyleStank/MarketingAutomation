@@ -34,10 +34,22 @@ internal static class QueueSnapshotValidation
         }
 
         var paid = room.Paid;
-        return paid == null || paid.TaskId > 0 && paid.Target != null && selected.Contains(paid.Target) &&
-            paid.Target.Equals(room.Admitted) && Finite(paid.Points) && Finite(paid.PointsLeft) &&
-            paid.Points > 0 && paid.PointsLeft > 0 && paid.PointsLeft <= paid.Points;
+        if (paid == null)
+        {
+            return true;
+        }
+
+        return HasValidPaidCampaign(paid, room.Admitted, selected);
     }
 
-    private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
+    private static bool HasValidPaidCampaign(PaidCampaignSnapshot paid, ProductIdentity admitted,
+        HashSet<ProductIdentity> selected)
+    {
+        // Paid work must belong to the same admitted product whose continuation the scheduler will resume.
+        return paid.TaskId > 0 && paid.Target != null && selected.Contains(paid.Target) &&
+               paid.Target.Equals(admitted) && IsFinite(paid.Points) && IsFinite(paid.PointsLeft) &&
+               paid.Points > 0 && paid.PointsLeft > 0 && paid.PointsLeft <= paid.Points;
+    }
+
+    private static bool IsFinite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 }

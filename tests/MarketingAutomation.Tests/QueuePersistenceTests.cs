@@ -1,9 +1,11 @@
 using System;
 using System.IO;
 using System.Linq;
-using MarketingAutomation;
+using MarketingAutomation.Automation;
+using MarketingAutomation.GameIntegration.Marketing;
+using MarketingAutomation.Persistence;
 
-internal static class QueuePersistenceChecks
+internal static class QueuePersistenceTests
 {
     internal static void Run()
     {

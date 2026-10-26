@@ -1,7 +1,7 @@
 using System;
-using MarketingAutomation;
+using MarketingAutomation.Automation;
 
-internal static class QueueSchedulerChecks
+internal static class QueueSchedulerTests
 {
     internal static void Run()
     {

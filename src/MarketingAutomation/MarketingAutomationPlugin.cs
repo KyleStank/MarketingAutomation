@@ -1,7 +1,7 @@
 using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
-using MarketingAutomation.Automation;
+using MarketingAutomation.Automation.Runtime;
 using MarketingAutomation.GameIntegration;
 using MarketingAutomation.UI;
 
@@ -33,6 +33,7 @@ public class MarketingAutomationPlugin : BaseUnityPlugin
             _harmony = new Harmony(PluginMetadata.Id);
             InstallIntegration<MarketingMenuIntegration>();
             InstallIntegration<QueueIntegration>();
+            InstallIntegration<QueuePersistenceIntegration>();
 
             Logger.LogInfo($"{PluginMetadata.Name} finished loading.");
         }

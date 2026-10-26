@@ -44,7 +44,7 @@ or midway settings editing.
   both form and picker and starts paid work or visible Waiting, without a preview.
 
 See [UI integration evidence](../research/integrations/configuration-ui.md) and
-[form/selection checks](../tests/MarketingAutomation.Checks/Program.cs).
+[form/selection checks](../tests/MarketingAutomation.Tests/Program.cs).
 
 ## Scheduling
 
@@ -73,7 +73,7 @@ hype. Resume when selected work becomes eligible and affordable. This is ongoing
 maintenance, not a finite pass.
 
 See [queue integration evidence](../research/integrations/queue-and-room-integration.md)
-and [scheduler checks](../tests/MarketingAutomation.Checks/QueueSchedulerChecks.cs).
+and [scheduler checks](../tests/MarketingAutomation.Tests/QueueSchedulerTests.cs).
 
 ## Stop, Cancel, and Support
 
@@ -116,4 +116,4 @@ without weakening task/product/campaign identity checks. Loading preferences mus
 act like a manual employee-toggle click.
 
 See [persistence evidence and validation limits](../research/integrations/persistence-and-recovery.md)
-and [checkpoint checks](../tests/MarketingAutomation.Checks/QueuePersistenceChecks.cs).
+and [checkpoint checks](../tests/MarketingAutomation.Tests/QueuePersistenceTests.cs).

@@ -35,24 +35,14 @@ internal readonly struct ProductSortValue
 
 internal static class ProductListSorting
 {
-    // Match the native selectors' date key, including their undated sentinel
-    // and culture-dependent text construction. Queue dates remain numeric.
-    internal static float ReleaseKey(int year, int month, bool undated)
-    {
-        if (undated)
-        {
-            return 999999f;
-        }
-
-        float.TryParse(year.ToString() + ((float)month / 13f).ToString(), out var key);
-        return key;
-    }
-
     internal static int Compare(ProductSortValue left, ProductSortValue right, QueuePriority field)
     {
-        var comparison = field == QueuePriority.Name ? left.Name.CompareTo(right.Name)
-            : field == QueuePriority.Hype ? right.Hype.CompareTo(left.Hype)
-            : right.ReleaseKey.CompareTo(left.ReleaseKey);
+        var comparison = field switch
+        {
+            QueuePriority.Name => left.Name.CompareTo(right.Name),
+            QueuePriority.Hype => right.Hype.CompareTo(left.Hype),
+            _ => right.ReleaseKey.CompareTo(left.ReleaseKey)
+        };
         if (comparison != 0)
         {
             return comparison;

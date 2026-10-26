@@ -1,32 +1,49 @@
-using System.Collections;
-using MarketingAutomation.Automation;
-using MarketingAutomation.GameIntegration;
+using MarketingAutomation.Automation.Runtime;
+using MarketingAutomation.GameIntegration.Marketing;
 using UnityEngine;
 
 namespace MarketingAutomation.Persistence;
-
-internal sealed class QueueSaveCheckpoint
-{
-    internal mainScript Company;
-    internal string Path;
-    internal QueueSaveSnapshot Snapshot;
-    internal List<MarketingQueue> Suspended;
-    internal Exception CaptureError;
-}
-
-internal sealed class QueueLoadCheckpoint
-{
-    internal string Path;
-    internal string Fingerprint;
-    internal QueueSaveSnapshot Snapshot;
-    internal SnapshotMatch Match;
-}
 
 internal static class QueuePersistence
 {
     private static string GameVersion => typeof(taskMarketing).Assembly.ManifestModule.ModuleVersionId.ToString();
 
-    private static mainScript Company(savegameScript save)
+    internal static QueueSaveCheckpoint BeginSave(savegameScript save, int slot)
+    {
+        var state = new QueueSaveCheckpoint();
+        try
+        {
+            state.Company = FindCompany(save);
+            if (!state.Company || state.Company.multiplayer)
+            {
+                return state;
+            }
+
+            state.Path = ResolveNativeSavePath(state.Company, slot);
+            state.Snapshot = new QueueSaveSnapshot
+            {
+                GameVersion = GameVersion,
+                NativeFormat = save.saveGameVersion,
+                CompanyId = state.Company.myID,
+                Rooms = MarketingQueueRegistry.CaptureActive(save)
+            };
+        }
+        catch (Exception exception)
+        {
+            state.CaptureError = exception;
+            MarketingAutomationPlugin.Logger.LogError($"Unable to capture Marketing queues: {exception}");
+            PersistenceDiagnostics.Record($"Capture failed for slot {slot}.", exception);
+        }
+        finally
+        {
+            // Transient waiting/completed tasks must be hidden even if checkpoint capture failed.
+            state.Suspended = MarketingQueueRegistry.SuspendForSave(save);
+        }
+
+        return state;
+    }
+
+    private static mainScript FindCompany(savegameScript save)
     {
         var company = save.GetComponent<mainScript>();
         if (company)
@@ -38,7 +55,7 @@ internal static class QueuePersistence
         return main ? main.GetComponent<mainScript>() : null;
     }
 
-    private static string NativePath(mainScript company, int slot)
+    private static string ResolveNativeSavePath(mainScript company, int slot)
     {
         var settings = new ES3Settings(company.GetSavegameTitle() + slot + ".sav");
         if (settings.location != ES3.Location.File)
@@ -49,42 +66,8 @@ internal static class QueuePersistence
         return System.IO.Path.GetFullPath(settings.FullPath);
     }
 
-    private static QueueSnapshotStore Store(string nativePath) =>
+    private static QueueSnapshotStore OpenSnapshotStore(string nativePath) =>
         new(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(nativePath), "MarketingAutomation", "Snapshots"));
-
-    internal static QueueSaveCheckpoint BeginSave(savegameScript save, int slot)
-    {
-        var state = new QueueSaveCheckpoint();
-        try
-        {
-            state.Company = Company(save);
-            if (!state.Company || state.Company.multiplayer)
-            {
-                return state;
-            }
-
-            state.Path = NativePath(state.Company, slot);
-            state.Snapshot = new QueueSaveSnapshot
-            {
-                GameVersion = GameVersion,
-                NativeFormat = save.saveGameVersion,
-                CompanyId = state.Company.myID,
-                Rooms = MarketingQueue.CaptureActive(save)
-            };
-        }
-        catch (Exception exception)
-        {
-            state.CaptureError = exception;
-            MarketingAutomationPlugin.Logger.LogError($"Unable to capture Marketing queues: {exception}");
-            PersistenceDiagnostics.Record($"Capture failed for slot {slot}.", exception);
-        }
-        finally
-        {
-            state.Suspended = MarketingQueue.SuspendForSave(save);
-        }
-
-        return state;
-    }
 
     internal static void FinishSave(savegameScript save, ES3Writer writer, QueueSaveCheckpoint state,
         Exception nativeError)
@@ -119,7 +102,7 @@ internal static class QueuePersistence
                 throw new InvalidDataException("The native save destination differs from the captured checkpoint.");
             }
 
-            Store(state.Path).Publish(state.Path, state.Snapshot);
+            OpenSnapshotStore(state.Path).Publish(state.Path, state.Snapshot);
             MarketingAutomationPlugin.Logger.LogInfo(
                 $"Saved {state.Snapshot.Rooms.Length} active Marketing queues for slot snapshot {System.IO.Path.GetFileName(state.Path)}.");
         }
@@ -133,33 +116,43 @@ internal static class QueuePersistence
         }
         finally
         {
-            if (state.Suspended != null)
+            // Native saving may throw; the live room bindings still need to be restored.
+            RestoreSuspendedQueues(state.Suspended);
+        }
+    }
+
+    private static void RestoreSuspendedQueues(List<MarketingQueue> suspendedQueues)
+    {
+        if (suspendedQueues == null)
+        {
+            return;
+        }
+
+        foreach (var queue in suspendedQueues)
+        {
+            if (!queue)
             {
-                foreach (var queue in state.Suspended)
-                {
-                    if (queue)
-                    {
-                        try
-                        {
-                            queue.RestoreAfterSave();
-                        }
-                        catch (Exception exception)
-                        {
-                            queue.Stop("Save cleanup failed.");
-                            MarketingAutomationPlugin.Logger.LogError(
-                                $"Marketing queue save cleanup failed: {exception}");
-                            PersistenceDiagnostics.Record("Queue cleanup after saving failed.", exception);
-                        }
-                    }
-                }
+                continue;
+            }
+
+            try
+            {
+                queue.RestoreAfterSave();
+            }
+            catch (Exception exception)
+            {
+                queue.Stop("Save cleanup failed.");
+                MarketingAutomationPlugin.Logger.LogError($"Marketing queue save cleanup failed: {exception}");
+                PersistenceDiagnostics.Record("Queue cleanup after saving failed.", exception);
             }
         }
     }
 
     internal static QueueLoadCheckpoint BeginLoad(savegameScript save, int slot)
     {
-        MarketingQueue.ClearForLoad(save);
-        var company = Company(save);
+        MarketingQueueRegistry.ClearForLoad(save);
+
+        var company = FindCompany(save);
         if (!company || company.multiplayer)
         {
             return null;
@@ -167,8 +160,8 @@ internal static class QueuePersistence
 
         try
         {
-            var state = new QueueLoadCheckpoint { Path = NativePath(company, slot) };
-            state.Match = Store(state.Path).Read(state.Path, out state.Snapshot, out state.Fingerprint);
+            var state = new QueueLoadCheckpoint { Path = ResolveNativeSavePath(company, slot) };
+            state.Match = OpenSnapshotStore(state.Path).Read(state.Path, out state.Snapshot, out state.Fingerprint);
             return state;
         }
         catch (Exception exception)
@@ -182,7 +175,7 @@ internal static class QueuePersistence
 
     internal static void FinishLoad(savegameScript save, QueueLoadCheckpoint state)
     {
-        var company = Company(save);
+        var company = FindCompany(save);
         if (state == null || !company || company.multiplayer || save.loadingSavegame)
         {
             return;
@@ -202,55 +195,9 @@ internal static class QueuePersistence
                 throw new InvalidDataException($"Automation snapshot match result: {state.Match}.");
             }
 
-            if (QueueSnapshotStore.Fingerprint(state.Path, out _) != state.Fingerprint)
-            {
-                throw new InvalidDataException("The native save changed during loading.");
-            }
+            ValidateLoadedSnapshot(save, state, company);
 
-            if (!QueueSnapshotValidation.HeaderMatches(state.Snapshot, GameVersion, save.saveGameVersion, company.myID))
-            {
-                throw new InvalidDataException(
-                    "Automation snapshot game version, native format, or company does not match.");
-            }
-
-            var seen = new HashSet<int>();
-            foreach (var record in state.Snapshot.Rooms)
-            {
-                if (!QueueSnapshotValidation.ValidRoom(record) || !seen.Add(record.RoomId))
-                {
-                    throw new InvalidDataException("Automation settings contain invalid or duplicated room records.");
-                }
-            }
-
-            var allProducts = MarketingProduct.ReadAll();
-            var rooms = UnityEngine.Object.FindObjectsOfType<roomScript>();
-            var tasks = GameObject.FindGameObjectsWithTag("Task");
-            var restored = 0;
-            var failed = 0;
-            foreach (var record in state.Snapshot.Rooms)
-            {
-                try
-                {
-                    RestoreRoom(company, record, allProducts, rooms, tasks);
-                    restored++;
-                }
-                catch (Exception exception)
-                {
-                    failed++;
-                    MarketingAutomationPlugin.Logger.LogWarning(
-                        $"Marketing queue for room {record.RoomId} was not restored: {exception.Message}");
-                    PersistenceDiagnostics.Record($"Room {record.RoomId} restoration failed for {state.Path}.",
-                        exception);
-                }
-            }
-
-            MarketingAutomationPlugin.Logger.LogInfo(
-                $"Restored {restored} Marketing queues without purchasing campaigns; {failed} could not be matched.");
-            if (failed > 0)
-            {
-                Notify(save, "Some Marketing automation could not be matched to this save and was left off. " +
-                             "Existing paid campaigns are unchanged. Configure automation again for the affected rooms.");
-            }
+            RestoreMatchingRooms(save, state, company);
         }
         catch (Exception exception)
         {
@@ -263,127 +210,72 @@ internal static class QueuePersistence
         }
     }
 
-    private static void RestoreRoom(mainScript company, RoomQueueSnapshot record, List<MarketingProduct> allProducts,
-        roomScript[] rooms, GameObject[] tasks)
+    private static void ValidateLoadedSnapshot(savegameScript save, QueueLoadCheckpoint state, mainScript company)
     {
-        roomScript room = null;
-        foreach (var candidate in rooms)
+        if (QueueSnapshotStore.Fingerprint(state.Path, out _) != state.Fingerprint)
         {
-            if (candidate.myID == record.RoomId)
-            {
-                if (room)
-                {
-                    throw new InvalidDataException("Room identity is ambiguous.");
-                }
+            throw new InvalidDataException("The native save changed during loading.");
+        }
 
-                room = candidate;
+        if (!QueueSnapshotValidation.HeaderMatches(state.Snapshot, GameVersion, save.saveGameVersion, company.myID))
+        {
+            throw new InvalidDataException(
+                "Automation snapshot game version, native format, or company does not match.");
+        }
+
+        // Validate every record before restoring any room. Live-object failures are isolated per room later.
+        var seen = new HashSet<int>();
+        foreach (var record in state.Snapshot.Rooms)
+        {
+            if (!QueueSnapshotValidation.ValidRoom(record) || !seen.Add(record.RoomId))
+            {
+                throw new InvalidDataException("Automation settings contain invalid or duplicated room records.");
+            }
+        }
+    }
+
+    private static void RestoreMatchingRooms(savegameScript save, QueueLoadCheckpoint state, mainScript company)
+    {
+        var allProducts = MarketingProduct.ReadAll();
+        var rooms = UnityEngine.Object.FindObjectsOfType<roomScript>();
+        var tasks = GameObject.FindGameObjectsWithTag("Task");
+
+        var restored = 0;
+        var failed = 0;
+        foreach (var record in state.Snapshot.Rooms)
+        {
+            try
+            {
+                RoomQueueRestorer.Restore(company, record, allProducts, rooms, tasks);
+                restored++;
+            }
+            catch (Exception exception)
+            {
+                failed++;
+                MarketingAutomationPlugin.Logger.LogWarning(
+                    $"Marketing queue for room {record.RoomId} was not restored: {exception.Message}");
+                PersistenceDiagnostics.Record($"Room {record.RoomId} restoration failed for {state.Path}.",
+                    exception);
             }
         }
 
-        if (!room || room.typ != 6 || room.mS_ != company)
+        MarketingAutomationPlugin.Logger.LogInfo(
+            $"Restored {restored} Marketing queues without purchasing campaigns; {failed} could not be matched.");
+        if (failed > 0)
         {
-            throw new InvalidDataException("Marketing room no longer exists.");
+            Notify(save, "Some Marketing automation could not be matched to this save and was left off. " +
+                         "Existing paid campaigns are unchanged. Configure automation again for the affected rooms.");
         }
-
-        var selected = new List<MarketingProduct>();
-        foreach (var identity in record.Products)
-        {
-            MarketingProduct match = null;
-            foreach (var product in allProducts)
-            {
-                if (identity.Matches(product.Key))
-                {
-                    if (match != null)
-                    {
-                        throw new InvalidDataException("Product identity is ambiguous.");
-                    }
-
-                    match = product;
-                }
-            }
-
-            if (match != null)
-            {
-                selected.Add(match);
-            }
-        }
-
-        taskMarketing paid = null;
-        if (record.Paid != null)
-        {
-            if (room.taskID != record.Paid.TaskId ||
-                !selected.Exists(product => record.Paid.Target.Matches(product.Key)))
-            {
-                throw new InvalidDataException("The paid campaign binding does not match.");
-            }
-
-            var matches = 0;
-            foreach (var task in tasks)
-            {
-                if (task.name == "Task_" + record.Paid.TaskId)
-                {
-                    matches++;
-                    paid = task.GetComponent<taskMarketing>();
-                }
-            }
-
-            if (matches != 1 || !paid || paid.myID != record.Paid.TaskId || paid.typ != record.Paid.Target.Kind ||
-                paid.targetID != record.Paid.Target.Id || paid.kampagne != record.Campaign || paid.automatic ||
-                paid.stopAutomatic || paid.disableWarten)
-            {
-                throw new InvalidDataException(
-                    $"Native campaign identity/flags differ from checkpoint task {record.Paid.TaskId}; matches={matches}.");
-            }
-
-            if (!NativeCampaignProgress.Matches(record.Paid.Points, paid.points) ||
-                !NativeCampaignProgress.Matches(record.Paid.PointsLeft, paid.pointsLeft))
-            {
-                throw new InvalidDataException($"Native campaign progress differs for task {paid.myID}: " +
-                                               $"checkpoint total/left={record.Paid.Points:R}/{record.Paid.PointsLeft:R}, " +
-                                               $"loaded total/left={paid.points:R}/{paid.pointsLeft:R}.");
-            }
-
-            foreach (var candidate in rooms)
-            {
-                if (candidate != room && candidate.taskID == paid.myID)
-                {
-                    throw new InvalidDataException("The campaign is assigned to more than one room.");
-                }
-            }
-        }
-        else if (room.taskID != -1)
-        {
-            throw new InvalidDataException("The waiting room now has an unrelated native task.");
-        }
-
-        MarketingQueue.Restore(room, company.guiMain_, selected, record, paid);
     }
 
     private static void Notify(savegameScript save, string message)
     {
-        var company = Company(save);
+        var company = FindCompany(save);
         if (!company || !company.guiMain_)
         {
             return;
         }
 
         save.gameObject.AddComponent<QueuePersistenceNotice>().Show(company.guiMain_, message);
-    }
-}
-
-public sealed class QueuePersistenceNotice : MonoBehaviour
-{
-    internal void Show(GUI_Main manager, string message) => StartCoroutine(Display(manager, message));
-
-    private IEnumerator Display(GUI_Main manager, string message)
-    {
-        yield return null; // Let the native save/load UI finish its own callbacks.
-        if (manager)
-        {
-            manager.MessageBox(message, false);
-            manager.uiObjects[40].transform.SetAsLastSibling();
-        }
-
-        Destroy(this);
     }
 }

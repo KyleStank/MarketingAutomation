@@ -3,8 +3,12 @@
         <OutputType>Exe</OutputType>
         <TargetFramework>net8.0</TargetFramework>
         <LangVersion>latest</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
     </PropertyGroup>
     <ItemGroup>
+        <Compile Include="../../src/MarketingAutomation/Automation/ProductKey.cs" Link="ProductKey.cs"/>
+        <Compile Include="../../src/MarketingAutomation/Automation/QueueCandidate.cs" Link="QueueCandidate.cs"/>
+        <Compile Include="../../src/MarketingAutomation/UI/ProductSortOptions.cs" Link="ProductSortOptions.cs"/>
         <Compile Include="../../src/MarketingAutomation/UI/ProductSelection.cs" Link="ProductSelection.cs"/>
         <Compile Include="../../src/MarketingAutomation/UI/AutomationFormState.cs" Link="AutomationFormState.cs"/>
         <Compile Include="../../src/MarketingAutomation/Automation/CampaignConfiguration.cs" Link="CampaignConfiguration.cs"/>
@@ -13,6 +17,9 @@
         <Compile Include="../../src/MarketingAutomation/Persistence/QueueSnapshot.cs" Link="QueueSnapshot.cs"/>
         <Compile Include="../../src/MarketingAutomation/Persistence/QueueSnapshotStore.cs" Link="QueueSnapshotStore.cs"/>
         <Compile Include="../../src/MarketingAutomation/Persistence/QueueSnapshotValidation.cs" Link="QueueSnapshotValidation.cs"/>
-        <Compile Include="../../src/MarketingAutomation/GameIntegration/NativeCampaignProgress.cs" Link="NativeCampaignProgress.cs"/>
+        <Compile Include="../../src/MarketingAutomation/GameIntegration/Marketing/NativeCampaignProgress.cs" Link="NativeCampaignProgress.cs"/>
+        <Compile Include="../../src/MarketingAutomation/Automation/QueueOrdering.cs" Link="QueueOrdering.cs"/>
+        <Compile Include="../../src/MarketingAutomation/UI/QueuePriorityText.cs" Link="QueuePriorityText.cs"/>
+        <Compile Include="../../src/MarketingAutomation/GameIntegration/Marketing/NativeProductOrdering.cs" Link="NativeProductOrdering.cs"/>
     </ItemGroup>
 </Project>

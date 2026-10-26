@@ -58,7 +58,7 @@ in-game observations. Prior user acceptance does not automatically cover later s
 integration reports record runtime gaps and focused manual checks. Do not claim unexecuted checks passed.
 
 ```text
-dotnet run --project tests/MarketingAutomation.Checks/MarketingAutomation.Checks.csproj
+dotnet run --project tests/MarketingAutomation.Tests/MarketingAutomation.Tests.csproj
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/DevelopmentScripts/check-development-scripts.ps1
 ```
 
@@ -75,7 +75,7 @@ dotnet format whitespace MarketingAutomation.sln --no-restore
 dotnet format style MarketingAutomation.sln --no-restore --diagnostics IDE0011 --severity info
 ```
 
-Use the equivalent commands against `tests/MarketingAutomation.Checks/MarketingAutomation.Checks.csproj`
+Use the equivalent commands against `tests/MarketingAutomation.Tests/MarketingAutomation.Tests.csproj`
 when editing checks. Never target `reference/` with formatting, builds or dependency restoration.
 
 ## Working boundaries
@@ -101,11 +101,25 @@ Follow [.editorconfig](.editorconfig). Use clear English for mod-owned
 names, comments, diagnostics and default UI text. Preserve exact native symbols, reflection strings,
 serialized identifiers and asset keys. Call the assisting-room mechanic **Support**.
 
-Keep responsibilities in `UI`, `UI/Controls`, `Automation`, `GameIntegration` and `Persistence`, with
-matching namespaces under `MarketingAutomation`; `MarketingAutomationPlugin.cs` is the bootstrap.
-`AutomationScreen` owns form lifecycle, navigation and confirmation; `ProductListView` owns its
-product list. Keep helpers near their workflow and explain native constraints rather than obvious code.
-Preserve persisted type/member names and enum values during refactoring.
+Optimize source for human review: use descriptive method names, separate conceptual steps with
+whitespace, and place helpers directly below their callers where practical, regardless of visibility.
+Group statements by purpose (validation, state changes, native binding, presentation), leaving a
+blank line between those steps. A formatter cannot supply this organization; review it explicitly.
+Brace-free single statements are allowed; retain braces for multiline bodies. Explain German native
+symbols and asset names in English once per relevant file. Comment non-obvious constraints and
+decisions, rather than restating the code. Aim for files under 500 lines by extracting cohesive
+responsibilities into separate classes, not partial files.
+
+Choose folders and namespaces by responsibility, and keep dependencies directed toward shared
+models rather than presentation code. Separate pure scheduling decisions, native game adaptation,
+UI construction/lifecycle and checkpoint storage/recovery. Keep each piece of mutable state with
+one clear owner; use small concrete collaborators instead of generic frameworks or partial classes.
+Keep helpers near their workflow and explain native constraints rather than obvious code.
+Expose native UI array slots through named adapter properties, with bindings verified against native
+sources; keep numeric slot knowledge at that integration boundary rather than in calling workflows.
+Preserve persisted type/member names and enum values during refactoring; namespace moves must
+also preserve serialized contract identities. Treat the plugin bootstrap and `BaseIntegration`
+as the user's reference style; ask about specific changes before refactoring those two files.
 
 `PluginMetadata.cs` owns the BepInEx GUID/name/version. Keep the GUID stable and its version aligned
 with the project version; do not regenerate plugin metadata. Keep these instructions current when

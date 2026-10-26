@@ -1,20 +1,26 @@
 using System.Runtime.Serialization;
-using MarketingAutomation.UI;
+using MarketingAutomation.Automation;
 
 namespace MarketingAutomation.Persistence;
 
+// Serialized names, member order, and integer values are the checkpoint compatibility contract.
 [DataContract]
 internal sealed class ProductIdentity : IEquatable<ProductIdentity>
 {
     [DataMember(Order = 0)] internal int Kind;
     [DataMember(Order = 1)] internal int Id;
 
-    internal static ProductIdentity From(ProductKey key) => new() { Kind = (int)key.Kind, Id = key.NativeId };
-    internal bool Matches(ProductKey key) => Kind == (int)key.Kind && Id == key.NativeId;
-    public bool Equals(ProductIdentity other) => other != null && Kind == other.Kind && Id == other.Id;
-    public override bool Equals(object value) => value is ProductIdentity other && Equals(other);
-    public override int GetHashCode() => unchecked(Kind * 397 ^ Id);
     internal bool IsValid => (Kind == (int)ProductKind.Game || Kind == (int)ProductKind.Console) && Id > 0;
+
+    internal static ProductIdentity From(ProductKey key) => new() { Kind = (int)key.Kind, Id = key.NativeId };
+
+    internal bool Matches(ProductKey key) => Kind == (int)key.Kind && Id == key.NativeId;
+
+    public bool Equals(ProductIdentity other) => other != null && Kind == other.Kind && Id == other.Id;
+
+    public override bool Equals(object value) => value is ProductIdentity other && Equals(other);
+
+    public override int GetHashCode() => unchecked(Kind * 397 ^ Id);
 }
 
 [DataContract]

@@ -1,3 +1,4 @@
+using MarketingAutomation.GameIntegration.UI;
 using MarketingAutomation.UI.Controls;
 using UnityEngine;
 using UnityEngine.UI;
@@ -7,45 +8,42 @@ namespace MarketingAutomation.UI;
 // One component per native picker; the native Init call refreshes its room on every opening.
 public sealed class MarketingMenuExtension : MonoBehaviour
 {
-    private static readonly HashSet<MarketingMenuExtension> Instances = new();
-    private Menu_Marketing_Main picker;
-    private GUI_Main menuManager;
-    private roomScript room;
-    private RectTransform nativeWindow;
-    private Vector2 originalWindowSize;
-    private RectTransform nativeDescription;
-    private Vector2 originalDescriptionPosition;
-    private GameObject entry;
-    private GameObject panel;
-    private AutomationScreen automationScreen;
-    private readonly List<tooltip> suspendedShortcuts = new();
-    private sfxScript soundEffects;
-    private bool restoreShortcutsAfterUpdate;
-    private bool failed;
-    private bool layoutChanged;
+    private static readonly HashSet<MarketingMenuExtension> Instances = [];
+    private Menu_Marketing_Main _picker;
+    private GUI_Main _menuManager;
+    private roomScript _room;
+    private RectTransform _nativeWindow;
+    private Vector2 _originalWindowSize;
+    private RectTransform _nativeDescription;
+    private Vector2 _originalDescriptionPosition;
+    private GameObject _entry;
+    private GameObject _panel;
+    private AutomationScreen _automationScreen;
+    private readonly List<tooltip> _suspendedShortcuts = [];
+    private sfxScript _soundEffects;
+    private bool _restoreShortcutsAfterUpdate;
+    private bool _failed;
+    private bool _layoutChanged;
 
     internal void Bind(Menu_Marketing_Main menu, roomScript selectedRoom)
     {
-        room = selectedRoom;
-        if (failed)
-        {
+        _room = selectedRoom;
+
+        if (_failed)
             return;
-        }
 
         try
         {
-            if (!entry)
+            if (!_entry)
             {
-                picker = menu;
+                _picker = menu;
                 Instances.Add(this);
                 Build();
-                MarketingAutomationPlugin.Logger.LogInfo(
-                    "Automation entry and panel created for the Marketing picker.");
             }
         }
         catch (Exception exception)
         {
-            failed = true;
+            _failed = true;
             Cleanup();
             MarketingAutomationPlugin.Logger.LogError(
                 $"Automation UI unavailable; native Marketing choices retained: {exception}");
@@ -54,63 +52,105 @@ public sealed class MarketingMenuExtension : MonoBehaviour
 
     private void Build()
     {
-        menuManager = picker.GetComponentInParent<GUI_Main>();
-        if (!menuManager)
-        {
+        _menuManager = _picker.GetComponentInParent<GUI_Main>();
+        if (!_menuManager)
             throw new InvalidOperationException("Marketing picker has no GUI_Main ancestor.");
-        }
 
+        // Native hierarchy names: Menue means menu; Konsolen means consoles.
         // Paths verified against scene01.unity, Marketing root GO11143 / component92398.
-        nativeWindow = Require<RectTransform>(picker.transform, "Menue");
-        var gameButton = Require<Button>(nativeWindow, "Button_Games");
-        var consoleButton = Require<Button>(nativeWindow, "Button_Konsolen");
+        _nativeWindow = Require<RectTransform>(_picker.transform, "Menue");
+        _nativeDescription = Require<RectTransform>(_nativeWindow, "Text");
+        var gameButton = Require<Button>(_nativeWindow, "Button_Games");
+        var consoleButton = Require<Button>(_nativeWindow, "Button_Konsolen");
+
         var soundObject = GameObject.Find("SFX");
-        soundEffects = soundObject ? soundObject.GetComponent<sfxScript>() : null;
-        nativeDescription = Require<RectTransform>(nativeWindow, "Text");
-        var overlay = picker.GetComponent<Image>();
+        _soundEffects = soundObject ? soundObject.GetComponent<sfxScript>() : null;
+
+        var overlay = _picker.GetComponent<Image>();
         if (!overlay || !gameButton.image)
-        {
             throw new InvalidOperationException("Marketing picker image bindings are incomplete.");
+
+        _originalWindowSize = _nativeWindow.sizeDelta;
+        _originalDescriptionPosition = _nativeDescription.anchoredPosition;
+
+        BuildAutomationPanel(overlay);
+        var spacing = AddAutomationEntry(gameButton, consoleButton);
+        ExpandNativePicker(spacing);
+    }
+
+    private static T Require<T>(Transform root, string path) where T : Component
+    {
+        var child = root.Find(path);
+        var component = child ? child.GetComponent<T>() : null;
+        return !component
+            ? throw new InvalidOperationException($"Missing Marketing UI binding: {path} ({typeof(T).Name}).")
+            : component;
+    }
+
+    private void BuildAutomationPanel(Image overlay)
+    {
+        _panel = UiFactory.CreateRect("MarketingAutomationPanel", _picker.transform.parent).gameObject;
+        _panel.SetActive(false);
+        UiFactory.Stretch((RectTransform)_panel.transform);
+
+        var panelImage = UiFactory.CopyImage(overlay, _panel);
+
+        // Init may run before the native Fill_Window.Start initializes its material.
+        panelImage.material = _menuManager.matFill_Window;
+
+        _automationScreen = _panel.AddComponent<AutomationScreen>();
+        _automationScreen.Build(_menuManager, FindAutomationIcon(), ReturnToCampaignPicker, CloseAfterAutomationStarted);
+    }
+
+    private Sprite FindAutomationIcon()
+    {
+        // Search the template's serialized images, including inactive task-specific panels.
+        var roomUi = new NativeRoomUi(_room);
+        var controlsPrefab = roomUi.ControlsPrefab;
+        if (controlsPrefab)
+        {
+            foreach (var image in controlsPrefab.GetComponentsInChildren<Image>(true))
+            {
+                if (image.sprite && image.sprite.name == "iconAutomatic")
+                    return image.sprite;
+            }
         }
 
-        originalWindowSize = nativeWindow.sizeDelta;
-        originalDescriptionPosition = nativeDescription.anchoredPosition;
-        panel = UiFactory.CreateRect("MarketingAutomationPanel", picker.transform.parent).gameObject;
-        panel.SetActive(false);
-        UiFactory.Stretch((RectTransform)panel.transform);
-        var panelImage = UiFactory.CopyImage(overlay, panel);
-        // Init may run before the native Fill_Window.Start initializes its material.
-        panelImage.material = menuManager.matFill_Window;
+        throw new InvalidOperationException("Native room controls have no iconAutomatic sprite.");
+    }
 
-        automationScreen = panel.AddComponent<AutomationScreen>();
-        automationScreen.Build(menuManager, FindAutomationIcon(), Back, Started);
-
+    private float AddAutomationEntry(Button gameButton, Button consoleButton)
+    {
         // New controls copy visual properties only: no native callbacks or label scripts.
         var spacing = Mathf.Abs(((RectTransform)consoleButton.transform).anchoredPosition.y -
                                 ((RectTransform)gameButton.transform).anchoredPosition.y);
-        var entryButton = UiFactory.CreateMenuEntry("MarketingAutomationEntry", nativeWindow, gameButton,
+        var entryButton = UiFactory.CreateMenuEntry("MarketingAutomationEntry", _nativeWindow, gameButton,
             "Automation", FindAutomationIcon());
-        entry = entryButton.gameObject;
-        ((RectTransform)entry.transform).anchoredPosition =
+        _entry = entryButton.gameObject;
+        ((RectTransform)_entry.transform).anchoredPosition =
             ((RectTransform)consoleButton.transform).anchoredPosition - new Vector2(0f, spacing);
-        entryButton.onClick.AddListener(Open);
+        entryButton.onClick.AddListener(OpenAutomationForm);
 
-        layoutChanged = true;
-        nativeWindow.sizeDelta = originalWindowSize + new Vector2(0f, spacing);
-        // Preserve the original description's distance from the top of the enlarged picker.
-        nativeDescription.anchoredPosition = originalDescriptionPosition + new Vector2(0f, spacing / 2f);
+        return spacing;
     }
 
-    private void Open()
+    private void ExpandNativePicker(float spacing)
     {
-        if (!room || !menuManager || !panel || panel.activeSelf)
-        {
+        _layoutChanged = true;
+        _nativeWindow.sizeDelta = _originalWindowSize + new Vector2(0f, spacing);
+
+        // Preserve the original description's distance from the top of the enlarged picker.
+        _nativeDescription.anchoredPosition = _originalDescriptionPosition + new Vector2(0f, spacing / 2f);
+    }
+
+    private void OpenAutomationForm()
+    {
+        if (!_room || !_menuManager || !_panel || _panel.activeSelf)
             return;
-        }
 
         try
         {
-            automationScreen.Show(room);
+            _automationScreen.Show(_room);
         }
         catch (Exception exception)
         {
@@ -119,91 +159,60 @@ public sealed class MarketingMenuExtension : MonoBehaviour
         }
 
         RestoreShortcuts();
-        panel.transform.SetAsLastSibling();
-        // Keep the picker underneath, as BUTTON_Game/BUTTON_Konsole do. Its Escape
+        _panel.transform.SetAsLastSibling();
+
+        // Keep the picker underneath, as the native game/console actions do. Its Escape
         // handler must not compete with the child menu for the same key release.
-        foreach (var shortcut in picker.GetComponentsInChildren<tooltip>(true))
+        foreach (var shortcut in _picker.GetComponentsInChildren<tooltip>(true))
         {
             if (shortcut.enabled && shortcut.shortcut != KeyCode.None)
             {
-                suspendedShortcuts.Add(shortcut);
+                _suspendedShortcuts.Add(shortcut);
                 shortcut.enabled = false;
             }
         }
 
-        soundEffects?.PlaySound(3, true);
-        menuManager.ActivateMenu(panel);
-        MarketingAutomationPlugin.Logger.LogInfo($"Opened Automation for Marketing room {room.myID}.");
-    }
-
-    private void Back()
-    {
-        panel.SetActive(false);
-        // Restore after all native tooltip Update calls, so this Escape release
-        // cannot also close the underlying picker during the same frame.
-        restoreShortcutsAfterUpdate = true;
-        soundEffects?.PlaySound(3, true);
-        // The existing modal stays open, preserving the game's pause/menu state.
-    }
-
-    private void Started()
-    {
-        panel.SetActive(false);
-        RestoreShortcuts();
-        picker.gameObject.SetActive(false);
-        menuManager.CloseMenu();
+        _soundEffects?.PlaySound(3, true);
+        _menuManager.ActivateMenu(_panel);
     }
 
     private void RestoreShortcuts()
     {
-        restoreShortcutsAfterUpdate = false;
-        foreach (var shortcut in suspendedShortcuts)
+        _restoreShortcutsAfterUpdate = false;
+
+        foreach (var shortcut in _suspendedShortcuts)
         {
             if (shortcut)
-            {
                 shortcut.enabled = true;
-            }
         }
 
-        suspendedShortcuts.Clear();
+        _suspendedShortcuts.Clear();
+    }
+
+    private void ReturnToCampaignPicker()
+    {
+        _panel.SetActive(false);
+
+        // Restore after all native tooltip Update calls, so this Escape release
+        // cannot also close the underlying picker during the same frame.
+        _restoreShortcutsAfterUpdate = true;
+        _soundEffects?.PlaySound(3, true);
+
+        // The existing modal stays open, preserving the game's pause/menu state.
+    }
+
+    private void CloseAfterAutomationStarted()
+    {
+        _panel.SetActive(false);
+        RestoreShortcuts();
+        _picker.gameObject.SetActive(false);
+        _menuManager.CloseMenu();
     }
 
     private void LateUpdate()
     {
-        if (restoreShortcutsAfterUpdate)
-        {
+        if (_restoreShortcutsAfterUpdate)
             RestoreShortcuts();
-        }
-    }
-
-    private static T Require<T>(Transform root, string path) where T : Component
-    {
-        var child = root.Find(path);
-        var component = child ? child.GetComponent<T>() : null;
-        if (!component)
-        {
-            throw new InvalidOperationException($"Missing Marketing UI binding: {path} ({typeof(T).Name}).");
-        }
-
-        return component;
-    }
-
-    private Sprite FindAutomationIcon()
-    {
-        // roomScript.InitUI uses uiObjects[0] as the native room-control prefab.
-        // Search its serialized images, including inactive task-specific panels.
-        if (room.uiObjects != null && room.uiObjects.Length > 0 && room.uiObjects[0])
-        {
-            foreach (var image in room.uiObjects[0].GetComponentsInChildren<Image>(true))
-            {
-                if (image.sprite && image.sprite.name == "iconAutomatic")
-                {
-                    return image.sprite;
-                }
-            }
-        }
-
-        throw new InvalidOperationException("Native room controls have no iconAutomatic sprite.");
     }
 
     internal static void RemoveAll()
@@ -211,9 +220,7 @@ public sealed class MarketingMenuExtension : MonoBehaviour
         foreach (var extension in new List<MarketingMenuExtension>(Instances))
         {
             if (!extension)
-            {
                 continue;
-            }
 
             extension.Cleanup();
             Destroy(extension);
@@ -224,33 +231,30 @@ public sealed class MarketingMenuExtension : MonoBehaviour
 
     private void Cleanup(bool closeModal = true)
     {
-        if (panel)
+        if (_panel)
         {
-            if (closeModal && panel.activeSelf && menuManager && (!picker || !picker.gameObject.activeInHierarchy))
-            {
-                menuManager.CloseMenu();
-            }
+            if (closeModal && _panel.activeSelf && _menuManager && (!_picker || !_picker.gameObject.activeInHierarchy))
+                _menuManager.CloseMenu();
 
-            panel.SetActive(false);
-            Destroy(panel);
+            _panel.SetActive(false);
+            Destroy(_panel);
         }
 
         RestoreShortcuts();
-        if (entry)
+
+        if (_entry)
         {
-            entry.SetActive(false);
-            Destroy(entry);
+            _entry.SetActive(false);
+            Destroy(_entry);
         }
 
-        if (layoutChanged && nativeWindow)
+        if (_layoutChanged && _nativeWindow)
         {
-            nativeWindow.sizeDelta = originalWindowSize;
-            if (nativeDescription)
-            {
-                nativeDescription.anchoredPosition = originalDescriptionPosition;
-            }
+            _nativeWindow.sizeDelta = _originalWindowSize;
+            if (_nativeDescription)
+                _nativeDescription.anchoredPosition = _originalDescriptionPosition;
 
-            layoutChanged = false;
+            _layoutChanged = false;
         }
     }
 

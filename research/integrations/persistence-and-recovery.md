@@ -9,7 +9,7 @@
   "project": "MarketingAutomation",
   "domains": ["persistence", "marketing", "recovery", "integration"],
   "keywords": ["snapshot", "immutable history", "SHA-256", "Stop", "Waiting", "admission", "paid progress", "G7", "employee toggle", "diagnostics", "autosave"],
-  "symbols": ["QueueIntegration.Install", "QueuePersistence.BeginSave", "QueuePersistence.FinishSave", "QueuePersistence.BeginLoad", "QueuePersistence.FinishLoad", "QueuePersistence.RestoreRoom", "QueueSnapshotStore", "QueueSnapshotValidation", "MarketingQueue.SuspendForSave", "MarketingQueue.CaptureActive", "MarketingQueue.Restore", "NativeCampaignProgress", "PersistenceDiagnostics.Record"],
+  "symbols": ["QueuePersistenceIntegration.Install", "QueuePersistence.BeginSave", "QueuePersistence.FinishSave", "QueuePersistence.BeginLoad", "QueuePersistence.FinishLoad", "RoomQueueRestorer.Restore", "QueueSnapshotCapture.Capture", "QueuePersistenceNotice", "QueueSaveCheckpoint", "QueueLoadCheckpoint", "QueueSnapshotStore", "QueueSnapshotValidation", "MarketingQueue.SuspendForSave", "MarketingQueueRegistry.CaptureActive", "MarketingQueueRegistry.SuspendForSave", "MarketingQueueRegistry.ClearForLoad", "MarketingQueue.CaptureSnapshot", "MarketingQueue.Restore", "NativeCampaignProgress", "QueueSnapshotStore.NormalizePaidProgressForComparison", "NativeGameUi.EmployeeSelectionToggle", "NativeGameUi.MessageDialog", "PersistenceDiagnostics.Record"],
   "source_sets": ["mgt2-managed", "marketing-automation-implementation"],
   "related": [
     {"id": "native-save-lifecycle", "relationship": "Provides actual native Save/Load order, ES3 sharing/number representation, and preference callback constraints"},
@@ -25,7 +25,8 @@
     {"label": "Checkpoint contract", "anchor": "checkpoint-model-and-storage", "summary": "Schema fields, typed identities, hash/payload addressing and immutable history"},
     {"label": "Save wrapper", "anchor": "save-capture-publication-and-cleanup", "summary": "Capture, owned transient exclusion, native exception preservation and external publication"},
     {"label": "Load reconciliation", "anchor": "load-and-native-paid-task-adoption", "summary": "Header/object/task validation and adoption without payment"},
-    {"label": "Native representation and preferences", "anchor": "native-representation-and-preferences", "summary": "G7 comparison, legacy checkpoint normalization and silent load-time toggle initialization."},
+    {"label": "Native representation and preferences", "anchor": "native-representation-and-preferences",
+   "summary": "G7 comparison, legacy checkpoint normalization and silent load-time toggle initialization."},
     {"label": "Validation evidence", "anchor": "unknowns-and-validation", "summary": "User-reported baseline versus isolated checks and still-unexecuted failure/autosave/MP cases"}
   ]
 }
@@ -48,20 +49,41 @@ constraints use `mgt2-managed` and the related standalone native reports.
 
 | Area | Inspected source |
 | --- | --- |
-| Patch registration and wrappers | `M/GameIntegration/QueueIntegration.cs:12–30,180–205` |
-| Capture, publication, load and room validation | `M/Persistence/QueuePersistence.cs:25–350` |
-| Serialized model | `M/Persistence/QueueSnapshot.cs:7–69` |
-| Structural/header validation | `M/Persistence/QueueSnapshotValidation.cs:7–41` |
-| Store, envelopes and conflict matching | `M/Persistence/QueueSnapshotStore.cs:8–176` |
-| Queue capture/suspension/adoption | `M/Automation/MarketingQueue.cs:348–507`; scheduling gates `:106–155` |
-| Representation comparison | `M/GameIntegration/NativeCampaignProgress.cs:6–37` |
-| Persistent IO diagnostics | `M/Persistence/PersistenceDiagnostics.cs:5–21` |
-| Isolated checks | `tests/MarketingAutomation.Checks/QueuePersistenceChecks.cs`; `NativeCampaignProgressChecks.cs` |
+| Patch registration and wrappers | `M/GameIntegration/QueuePersistenceIntegration.cs`: `Install`, `BeforeSave`, `AfterSave`, `BeforeLoad`, `AfterLoad`, `BeforePreferencesRestored` |
+| Save/load orchestration | `M/Persistence/QueuePersistence.cs`: `BeginSave`, `FinishSave`, `RestoreSuspendedQueues`, `BeginLoad`, `FinishLoad`, `ValidateLoadedSnapshot`, `RestoreMatchingRooms` |
+| Live identity and paid-task validation | `M/Persistence/RoomQueueRestorer.cs`: `Restore`, `FindMarketingRoom`, `ResolveSelectedProducts`, `ResolvePaidCampaign` |
+| Transient hook state and notification | `M/Persistence/QueuePersistenceCheckpoint.cs`: `QueueSaveCheckpoint`, `QueueLoadCheckpoint`; `M/Persistence/QueuePersistenceNotice.cs`: `Show`, `Display` |
+| Serialized model | `M/Persistence/QueueSnapshot.cs`: `QueueSaveSnapshot`, `RoomQueueSnapshot`, `PaidCampaignSnapshot`, `ProductIdentity` |
+| Structural/header validation | `M/Persistence/QueueSnapshotValidation.cs`: `HeaderMatches`, `ValidRoom`, `HasValidPaidCampaign` |
+| Store, envelopes and conflict matching | `M/Persistence/QueueSnapshotStore.cs`: `Publish`, `WriteNewEnvelope`, `Read`, `ReadEnvelope`, `Fingerprint` |
+| Queue capture/suspension/adoption | `M/Automation/Runtime/MarketingQueue.cs`: `CaptureSnapshot`, `CanCaptureTaskState`, `SuspendForSave`, `RestoreAfterSave`, `Restore`, `LateUpdate`; `M/Persistence/QueueSnapshotCapture.cs`: `Capture` |
+| Cross-room queue lifetime | `M/Automation/Runtime/MarketingQueueRegistry.cs`: `Register`, `Unregister`, `StopAll`, `ClearForLoad`, `CaptureActive`, `SuspendForSave`; `M/Automation/Runtime/QueueTaskOwnership.cs`: `Owner` |
+| Representation comparison | `M/GameIntegration/Marketing/NativeCampaignProgress.cs`: `SerializedValue`, `Matches`; `M/Persistence/QueueSnapshotStore.cs`: `NormalizePaidProgressForComparison` |
+| Native UI bindings | `M/GameIntegration/UI/NativeGameUi.cs`: `EmployeeSelectionToggle`, `ShowMessage`, `MessageDialog` |
+| Persistent IO diagnostics | `M/Persistence/PersistenceDiagnostics.cs`: `Record` |
+| Isolated checks | `tests/MarketingAutomation.Tests/QueuePersistenceTests.cs`; `NativeCampaignProgressTests.cs` |
 
 F-004 records user runtime observations documented with the 2026-10-22 inspection.
 No per-scenario observation date or binary hash was captured; those observations do not validate later source edits.
 
 ## Architecture and State Ownership
+
+`QueuePersistenceIntegration` owns the Harmony save/load and preference hooks; the bootstrap installs it
+separately from room/task presentation hooks. `QueuePersistence` coordinates capture, publication, cleanup,
+and restoration. `QueueSaveCheckpoint` and `QueueLoadCheckpoint` are transient hook-call contexts, not serialized
+contracts. `RoomQueueRestorer` resolves native rooms/products/tasks and validates paid-task ownership before
+calling `MarketingQueue.Restore`. `QueueSnapshotCapture` converts live queue state to the existing snapshot
+schema. `MarketingQueue` in `MarketingAutomation.Automation.Runtime` retains private room state, task bindings,
+save-suspension mutations and capture-eligibility decisions. `MarketingQueueRegistry` in the same namespace owns
+the active-queue set and cross-room shutdown, load clearing, capture and suspension enumeration. Destructive
+shutdown/load operations enumerate a copy; capture/suspension retain live-set enumeration. The runtime
+`QueueTaskOwnership` marker can remain on paid work after Stop without retaining queue configuration.
+
+`NativeCampaignProgress` in `MarketingAutomation.GameIntegration.Marketing` accepts scalar values only;
+checkpoint traversal and normalization belong to `QueueSnapshotStore`. Native UI slots used by persistence
+are resolved through `MarketingAutomation.GameIntegration.UI.NativeGameUi`.
+`QueuePersistenceNotice` owns the deferred native message-box coroutine. These boundaries are documented from
+the 2026-10-26 static refactor review; they do not establish runtime equivalence.
 
 ### Checkpoint model and storage
 
@@ -69,23 +91,27 @@ No per-scenario observation date or binary hash was captured; those observations
 `RoomQueueSnapshot` stores room ID, native campaign index, integer threshold, persisted priority/direction enum
 values, selected typed product identities, optional admitted product, and optional paid-task checkpoint.
 `PaidCampaignSnapshot` stores task ID, typed target, total points and remaining points. ProductIdentity is
-kind/native ID; Unity runtime instance IDs are deliberately absent from persisted identity.
+kind/native ID; Unity runtime instance IDs are deliberately absent from persisted identity. These DTOs remain
+in `MarketingAutomation.Persistence`, and the nested `QueueSnapshotStore.SnapshotEnvelope` retains its identity.
+Runtime and native-adapter namespace moves do not change serialized type/member names, order or enum values.
 
 `QueueSnapshotValidation.ValidRoom` rejects invalid room/campaign/enums, empty/duplicate selections, invalid
 typed products, admission outside selection, inconsistent paid target/admission, and nonfinite or impossible
-work (`M/Persistence/QueueSnapshotValidation.cs:11–41`). Threshold nonnegativity is structural; restoration
+work (`M/Persistence/QueueSnapshotValidation.cs`, `ValidRoom` and `HasValidPaidCampaign`). Threshold nonnegativity
+is structural; restoration
 clamps to the current selected campaign's cap. Header checks require schema, game MVID, native format and
-company to match exactly (`:7–10`). No migration from an unknown newer schema is attempted.
+company to match exactly (`QueueSnapshotValidation.HeaderMatches`). No migration from an unknown newer schema is attempted.
 
-`QueuePersistence.NativePath` creates native ES3 settings, requires File location and resolves the same filename
+`QueuePersistence.ResolveNativeSavePath` creates native ES3 settings, requires File location and resolves the same filename
 to an absolute effective path. The store root is the native file's parent plus `MarketingAutomation/Snapshots`
-(`M/Persistence/QueuePersistence.cs:41–53`). This is resolved from effective settings, not a hardcoded machine path.
+(`M/Persistence/QueuePersistence.cs`, `ResolveNativeSavePath` and `OpenSnapshotStore`). This is resolved from
+effective settings, not a hardcoded machine path.
 
 Storage layout is `<root>/<native SHA-256>/<payload SHA-256>.json`. Each envelope contains schema, native
 digest/length, payload digest and Base64 JSON payload. Records are limited to 16 MiB. Native files are opened
 for reading only; their bytes are not rewritten by the store. A complete record is written to a unique `.tmp`,
 flushed with `Flush(true)`, closed and moved to the immutable destination. Identical existing payload records
-are integrity-checked and reused (`M/Persistence/QueueSnapshotStore.cs:14–77`).
+are integrity-checked and reused (`M/Persistence/QueueSnapshotStore.cs`, `Publish` and `WriteNewEnvelope`).
 
 There is no mutable per-slot index, automatic history purge, or latest-record preference in this implementation.
 Path changes can match identical bytes. Another process/native operation changing bytes may invalidate matching.
@@ -95,27 +121,34 @@ Checksums detect integrity mismatch; they are not authentication against an inte
 
 ### Save capture, publication, and cleanup
 
-1. `QueueIntegration.Install` patches native `savegameScript.Save(int)` with a prefix and finalizer. The prefix
+1. `QueuePersistenceIntegration.Install` patches native `savegameScript.Save(int)` with a prefix and finalizer. The prefix
    calls `QueuePersistence.BeginSave`; the finalizer calls `FinishSave` with the actual native writer and
-   exception, then returns the same exception (`M/GameIntegration/QueueIntegration.cs:26–30,197–205`).
+   exception, then returns the same exception (`M/GameIntegration/QueuePersistenceIntegration.cs`, `BeforeSave` and
+   `AfterSave`).
    There is no replacement serializer or suppression of the original Save.
 2. `BeginSave` resolves the company and returns early for absent company/MP. In SP it resolves the path and
    captures active queues with MVID/format/company header. Capture failures are recorded but do not become
-   native Save success. A finally block calls `MarketingQueue.SuspendForSave(save)`
-   (`M/Persistence/QueuePersistence.cs:55–85`).
+   native Save success. A finally block calls `MarketingQueueRegistry.SuspendForSave(save)`
+   (`M/Persistence/QueuePersistence.cs`, `BeginSave`).
 3. Capture includes only Running, Configured queues with valid room/save ownership and an owned current task
    or recognized completion boundary. Selected identities/rooms are deterministically sorted. Paid work is
    included only for an unfinished ordinary task; total/left are normalized using the saved numeric representation
-   (`M/Automation/MarketingQueue.cs:402–449`). Replaced/transferred/canceled work is not a valid resume checkpoint.
-4. Suspension targets only owned transient `taskWait` or completed tasks awaiting cleanup. It marks suspension,
-   deactivates that task, clears the room's task ID/cache, and leaves unfinished paid tasks native
-   (`M/Automation/MarketingQueue.cs:348–366`). This keeps the transient object out of native tagged enumeration
+   (`M/Automation/Runtime/MarketingQueueRegistry.cs`, `CaptureActive`;
+   `M/Automation/Runtime/MarketingQueue.cs`, `CaptureSnapshot` and `CanCaptureTaskState`;
+   `M/Persistence/QueueSnapshotCapture.cs`, `Capture`). Replaced/transferred/canceled work is not a valid resume
+   checkpoint.
+4. Registry suspension delegates to each queue, targeting only owned transient `taskWait` or completed tasks
+   awaiting cleanup. Each queue marks suspension and records itself in the cleanup list before deactivating the
+   task, then clears the room's task ID/cache. This preserves the obligation to restore bindings before native
+   `SetActive(false)` callbacks can run and leaves unfinished paid tasks native
+   (`M/Automation/Runtime/MarketingQueue.cs`, `SuspendForSave`). This keeps the transient object out of native tagged enumeration
    and the room's temporary binding out of `SaveRooms`.
 5. Original native Save performs serialization/commit. If it throws, the finalizer records failure and publishes
    no new checkpoint. If it returns normally, `FinishSave` requires the same File destination in actual writer
    settings, then publishes the captured snapshot against the completed file
-   (`M/Persistence/QueuePersistence.cs:88–150`).
-6. Cleanup runs in finally. `RestoreAfterSave` reactivates/rebinds only if the room/task still exist and the room
+   (`M/Persistence/QueuePersistence.cs`, `FinishSave`).
+6. Cleanup runs in finally through `QueuePersistence.RestoreSuspendedQueues`. `MarketingQueue.RestoreAfterSave`
+   reactivates/rebinds only if the room/task still exist and the room
    remains taskless; conflicting changes detach the queue rather than reclaim another task. Cleanup failure
    stops automation and is logged. Native exceptions remain native exceptions.
 
@@ -125,59 +158,69 @@ external publication can leave a valid native file without matching automation. 
 
 ### Load and native paid-task adoption
 
-1. Load prefix invokes `BeginLoad`. It first clears old queues/references for the native save owner, then skips
+1. Load prefix invokes `BeginLoad`. `MarketingQueueRegistry.ClearForLoad` first clears old queues/references
+   for the native save owner, then the coordinator skips
    SP restoration for multiplayer. In SP it reads the exact native digest/length and matching record candidates
-   (`M/Persistence/QueuePersistence.cs:152–173`). The read handle is disposed before native loading, respecting
+   (`M/Persistence/QueuePersistence.cs`, `BeginLoad`). The read handle is disposed before native loading, respecting
    ES3's `FileShare.None` constraint.
 2. `QueueSnapshotStore.Read` examines only `.json` records under that digest. It validates envelope/schema/
    native length/payload checksum, deserializes, normalizes historical paid floats for comparable payloads, and
    rejects genuinely differing payloads as Conflicting. A damaged candidate returns Damaged rather than silently
-   choosing another candidate. `.tmp` records are ignored (`M/Persistence/QueueSnapshotStore.cs:79–139`).
+   choosing another candidate. `.tmp` records are ignored (`M/Persistence/QueueSnapshotStore.cs`, `Read`).
 3. Original native Load reconstructs paid tasks. The mod's postfix runs only on successful normal return.
    `FinishLoad` requires SP and a cleared native loading flag, rehashes bytes to detect change across loading,
    then requires matching header and valid unique room records before resolving live objects
-   (`M/Persistence/QueuePersistence.cs:175–247`). Before/after equality is an association check, not an atomic
+   (`M/Persistence/QueuePersistence.cs`, `FinishLoad` and `ValidateLoadedSnapshot`). Before/after equality is an
+   association check, not an atomic
    proof against all possible external replace-and-restore races.
-4. `RestoreRoom` requires a unique matching Marketing room (type 6), the same company, and unique matching
+4. `RoomQueueRestorer.Restore` requires a unique matching Marketing room (type 6), the same company, and unique matching
    selected products. Missing selected products are omitted from currently resolved products; saved identities
    remain in the queue's captured selection set. A missing paid target rejects that room's restore.
 5. Paid checkpoints must match room taskID, a unique named native Task object, task ID, product kind/ID,
    campaign and all three false native flags. Total/left must match the representation rule. No second room may
    reference the same paid task. A waiting checkpoint instead requires `room.taskID == -1`
-   (`M/Persistence/QueuePersistence.cs:249–339`).
+   (`M/Persistence/RoomQueueRestorer.cs`, `ResolvePaidCampaign`, `FindMatchingPaidCampaign`, `ValidatePaidProgress`
+   and `ValidateExclusiveRoomAssignment`).
 6. `MarketingQueue.Restore` rebuilds the scheduler, clamps threshold, restores admission when its product is
    resolved, and delays execution past the current frame. For paid state it initializes references and binds
    the existing paid object; otherwise it creates a dormant owned waiter. Neither branch purchases a campaign
-   (`M/Automation/MarketingQueue.cs:452–507`). Background scanning additionally requires Running, SP, unpaused
-   room, cleared loading and positive game delta (`:106–155`). Native Load itself ends paused.
+   (`M/Automation/Runtime/MarketingQueue.cs`, `Restore`). Background scanning additionally requires Running, SP, unpaused
+   room, cleared loading and positive game delta (`MarketingQueue.LateUpdate`). Native Load itself ends paused.
 
-Header/duplicate-record failures reject the snapshot. Live binding failures are caught per room, so other
-independently valid room records can restore. Errors produce warnings and a deferred native message box; missing
-records merely log that native paid campaigns remain unchanged. This is not a whole-snapshot transactional restore.
+Header/duplicate-record failures reject the snapshot. `QueuePersistence.RestoreMatchingRooms` catches live
+binding failures per room, so other independently valid room records can restore. Errors produce warnings and a
+deferred native message box through
+`QueuePersistenceNotice.Display`; missing records merely log that native paid campaigns remain unchanged. This is
+not a whole-snapshot transactional restore.
 
 ### Native representation and preferences
 
 `NativeCampaignProgress.SerializedValue(float)` explicitly converts through invariant `G7` text and float.Parse.
-`Matches` accepts exact equality or equality after checkpoint serialization, with finite guards. Normalization
-touches only deserialized checkpoint values (`M/GameIntegration/NativeCampaignProgress.cs:6–37`). It does not
-write `paid.points` or `paid.pointsLeft`. Historical records are normalized for conflict comparison, so excess
-pre-save digits alone do not produce a false conflicting-settings result.
+`Matches` accepts exact equality or equality after checkpoint serialization, with finite guards
+(`M/GameIntegration/Marketing/NativeCampaignProgress.cs`, `SerializedValue` and `Matches`).
+`QueueSnapshotStore.NormalizePaidProgressForComparison` traverses only deserialized checkpoint values and calls
+the scalar converter. It does not write `paid.points` or `paid.pointsLeft`. Historical records are normalized
+for conflict comparison, so excess pre-save digits alone do not produce a false conflicting-settings result.
 
 The native writer uses invariant default float formatting, not an explicit `G7`. This mod encodes the recorded
 installed legacy-Mono behavior; its isolated checks emulate that representation on modern .NET. Source inspection
 alone does not prove every runtime/version formats identically. Task/product/campaign/flag checks remain strict,
 and nonfinite or materially different progress is rejected.
 
-`BeforePreferencesRestored` applies only while native loading is active in SP. It seeds only the employee-select
-toggle (`uiObjects[2]`) using `SetIsOnWithoutNotify` from the stored preference before native `InitToggles`
-(`M/GameIntegration/QueueIntegration.cs:180–190`). It does not change PlayerPrefs or bypass normal user-click
-confirmation. The native callback path is documented in native-save-lifecycle F-005.
+`QueuePersistenceIntegration.BeforePreferencesRestored` applies only while native loading is active in SP.
+It seeds `NativeGameUi.EmployeeSelectionToggle` (native `GUI_Main.uiObjects[2]`) using `SetIsOnWithoutNotify`
+from the stored preference before native `InitToggles`. It does not change PlayerPrefs or bypass normal
+user-click confirmation. `QueuePersistenceNotice.Display` similarly uses `NativeGameUi.ShowMessage` and
+`MessageDialog` (native slot 40) after yielding one frame, then raises that dialog above other menus.
+These named bindings are in `M/GameIntegration/UI/NativeGameUi.cs`; their call sites remain in
+`M/GameIntegration/QueuePersistenceIntegration.cs` and `M/Persistence/QueuePersistenceNotice.cs`.
+The native preference callback path is documented in native-save-lifecycle F-005.
 
 ### Diagnostics
 
 `PersistenceDiagnostics.Record` appends UTC timestamp, stage/reason and exception to
 `game_directory` + `BepInEx/MarketingAutomation.IO.log`; failure to append falls back to a loader warning
-(`M/Persistence/PersistenceDiagnostics.cs:5–21`). Errors distinguish capture, native Save, publication, cleanup,
+(`M/Persistence/PersistenceDiagnostics.cs`, `Record`). Errors distinguish capture, native Save, publication, cleanup,
 read, snapshot validation and per-room restoration, including expected/loaded work when progress differs.
 Append-only diagnostics survive normal per-session log replacement; they do not guarantee successful logging
 under disk or permission failure.
@@ -194,7 +237,7 @@ Standing: current
 
 Applies to: marketing-automation-implementation
 
-Evidence: `M/Persistence/QueueSnapshotStore.cs:21–139`, `Fingerprint`, `Publish`, `Read`, `ReadEnvelope`.
+Evidence: `M/Persistence/QueueSnapshotStore.cs`, `Fingerprint`, `Publish`, `Read`, `ReadEnvelope`.
 
 Explanation: Exact copies can match history, but the store cannot infer copy provenance. A corrupted candidate poisons matching for that content rather than being silently ignored. There is no automatic retention cleanup.
 
@@ -208,7 +251,7 @@ Standing: current
 
 Applies to: marketing-automation-implementation
 
-Evidence: `M/GameIntegration/QueueIntegration.cs:26–30,197–205`; `M/Persistence/QueuePersistence.cs:55–150`; `M/Automation/MarketingQueue.cs:348–385`.
+Evidence: `M/GameIntegration/QueuePersistenceIntegration.cs`, `BeforeSave` and `AfterSave`; `M/Persistence/QueuePersistence.cs`, `BeginSave` and `FinishSave`; `M/Automation/Runtime/MarketingQueue.cs`, `SuspendForSave` and `RestoreAfterSave`.
 
 Explanation: Native paid work remains in the native file. External publication failure is reported separately and cannot make native Save atomic with the record. The autosave scheduler itself is not patched.
 
@@ -222,7 +265,7 @@ Standing: current
 
 Applies to: marketing-automation-implementation
 
-Evidence: `M/Persistence/QueuePersistence.cs:175–339`; `M/Automation/MarketingQueue.cs:452–507`; `M/GameIntegration/NativeCampaignProgress.cs:6–37`.
+Evidence: `M/Persistence/QueuePersistence.cs`, `FinishLoad` and `ValidateLoadedSnapshot`; `M/Persistence/RoomQueueRestorer.cs`, `Restore`; `M/Automation/Runtime/MarketingQueue.cs`, `Restore`; `M/GameIntegration/Marketing/NativeCampaignProgress.cs`, `SerializedValue` and `Matches`.
 
 Explanation: Admission survives loading above the entry threshold. Threshold clamp changes custom settings only; native work remains authoritative. Waiting creates an owned dormant waiter after native load, with no purchase while paused.
 
@@ -248,12 +291,16 @@ baseline, not subsequent readability or UI donor-copy edits.
 
 ## Connections to Other Systems
 
-Native [save lifecycle](../../tools/mgt2-mod-toolkit/research/systems/native-save-lifecycle.md) owns serializer order, exclusive file sharing,
-numeric text and UI preference side effects. Native [identity/restoration](../../tools/mgt2-mod-toolkit/research/systems/save-identity-and-task-restoration.md)
+Native [save lifecycle](../../tools/mgt2-mod-toolkit/research/systems/native-save-lifecycle.md) owns serializer
+order, exclusive file sharing,
+numeric text and UI preference side effects. Native
+[identity/restoration](../../tools/mgt2-mod-toolkit/research/systems/save-identity-and-task-restoration.md)
 owns the snapshot-local identity limit. [Queue/room integration](queue-and-room-integration.md) owns lifecycle,
 admission, Stop and dormant waiter semantics. [Configuration UI](configuration-ui.md) owns draft cancellation.
 
-[Native multiplayer coordination](../../tools/mgt2-mod-toolkit/research/systems/multiplayer-session-and-save-coordination.md) remains research
+[Native multiplayer
+coordination](../../tools/mgt2-mod-toolkit/research/systems/multiplayer-session-and-save-coordination.md) remains
+research
 for future scope: BeginSave/BeginLoad/FinishLoad explicitly skip MP checkpoint restore/publication, and background
 queue scanning rejects MP. The presence of native MP hooks through the shared method is not a support promise.
 
@@ -272,8 +319,9 @@ Native and external commits are separate; a valid native save may exist without 
 | Evidence | Scope and limit |
 | --- | --- |
 | Source inspection, 2026-10-22 | Wrappers, store, model, validation, queue adoption and native constraints; no Unity/Harmony execution. |
-| [QueuePersistenceChecks.cs](../../tests/MarketingAutomation.Checks/QueuePersistenceChecks.cs) | Disposable files and model validation; not native saves, real writer compatibility or Unity task adoption. |
-| [NativeCampaignProgressChecks.cs](../../tests/MarketingAutomation.Checks/NativeCampaignProgressChecks.cs) | Representation/legacy-normalization checks on modern .NET; not an installed-Mono experiment. |
+| Refactor inspection, 2026-10-26 | Extracted hook registration, registry enumeration, room restoration, snapshot capture, scalar progress conversion and native UI bindings; compared control flow, exception cleanup, payment/adoption boundaries and serialized contracts. Static review only; no game execution. |
+| [QueuePersistenceTests.cs](../../tests/MarketingAutomation.Tests/QueuePersistenceTests.cs) | Disposable files and model validation; not native saves, real writer compatibility or Unity task adoption. |
+| [NativeCampaignProgressTests.cs](../../tests/MarketingAutomation.Tests/NativeCampaignProgressTests.cs) | Representation/legacy-normalization checks on modern .NET; not an installed-Mono experiment. |
 | User reports in F-004 | Manual continuity of the accepted baseline; no exhaustive recovery or subsequent-source acceptance. |
 
 - **Q-001 — Autosave:** the common Save method is hooked, but timer-triggered restoration remains unverified.

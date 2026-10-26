@@ -27,7 +27,7 @@ Metadata updated: 2026-10-26. Source sets: marketing-automation-implementation, 
 
 Keywords: build, netstandard2.1, BepInEx.Core, HarmonyX, DeployToGame, initialize, config, plugin GUID, MVID, UnpatchSelf
 
-Symbols: `MarketingAutomation.MarketingAutomationPlugin`, `PluginMetadata`, `QueueIntegration.Install`, `DeployPlugin`, `Get-ProjectLocalConfig`, `Assert-BepInExInstallation`
+Symbols: `MarketingAutomation.MarketingAutomationPlugin`, `PluginMetadata`, `QueueIntegration.Install`, `QueuePersistenceIntegration.Install`, `DeployPlugin`, `Get-ProjectLocalConfig`, `Assert-BepInExInstallation`
 
 | Entry point | Coverage |
 | --- | --- |
@@ -43,7 +43,7 @@ Related:
 - [loader-and-patching-boundaries](../tools/mgt2-mod-toolkit/research/INDEX.md#loader-and-patching-boundaries): Third-party plugin and patch ownership behavior.
 - [configuration-ui](#configuration-ui): UI extension attached by the menu Init postfix.
 - [queue-and-room-integration](#queue-and-room-integration): Queue hooks installed during bootstrap and removed on destruction.
-- [persistence-and-recovery](#persistence-and-recovery): Save/load hooks are installed through QueueIntegration.
+- [persistence-and-recovery](#persistence-and-recovery): Save/load hooks are installed through QueuePersistenceIntegration.
 
 ## configuration-ui
 
@@ -54,11 +54,11 @@ Metadata updated: 2026-10-26. Source sets: marketing-automation-implementation, 
 
 Keywords: Automation entry, configuration draft, Select All, pooled rows, search, multipage, threshold, queue priority, display sorting, Escape, native control adapters, validation dialog
 
-Symbols: `MarketingMenuIntegration.PatchInitializeMenu`, `MarketingMenuExtension`, `AutomationScreen`, `AutomationFormState`, `AutomationCampaignPage`, `ProductListView`, `ProductRow`, `ProductSelection`, `ProductKey`, `ProductListSorting`, `NativeDropdown`, `NativeUi`, `SearchInputFocus`, `CampaignConfiguration`, `ProductSortOptions`, `NativeCampaignCatalog`, `MarketingQueue.TryStart`
+Symbols: `MarketingMenuIntegration.PatchInitializeMenu`, `MarketingMenuExtension`, `AutomationScreen`, `AutomationFormState`, `AutomationCampaignPage`, `CampaignCard`, `ProductListView`, `ProductRow`, `ProductSelection`, `ProductKey`, `ProductListSorting`, `NativeProductOrdering.ReleaseDateKey`, `DropdownFactory`, `NativeVisualTree.Copy`, `NativeUiLookup.RequireComponent`, `NativeGameUi`, `SearchInputFocus`, `CampaignConfiguration`, `ProductSortOptions`, `QueuePriorityText`, `NativeCampaignCatalog`, `MarketingQueue.TryStart`
 
 | Entry point | Coverage |
 | --- | --- |
-| [Implementation ownership map](integrations/configuration-ui.md#architecture-and-state-ownership) | Form, product view, rows, selection model and visual adapters have distinct responsibilities. |
+| [Implementation ownership map](integrations/configuration-ui.md#architecture-and-state-ownership) | Form state, product views, native bindings and fresh-control factories have distinct responsibilities. |
 | [Open navigate close confirm](integrations/configuration-ui.md#behavior-and-call-flows) | Picker layering, root closure reset, freely navigable child pages and native error dialogs. |
 | [Display sort versus queue priority](integrations/configuration-ui.md#f-003--display-order-and-queue-priority-share-labels-but-use-separate-state-and-rules) | Native descending list keys versus configurable dispatch directions and persisted enum mapping. |
 | [Actual validation boundary](integrations/configuration-ui.md#unknowns-and-validation) | User acceptance predates current readability refactor; current evidence is static only. |
@@ -82,7 +82,7 @@ Metadata updated: 2026-10-26. Source sets: mgt2-managed, marketing-automation-im
 
 Keywords: snapshot, immutable history, SHA-256, Stop, Waiting, admission, paid progress, G7, employee toggle, diagnostics, autosave
 
-Symbols: `QueueIntegration.Install`, `QueuePersistence.BeginSave`, `QueuePersistence.FinishSave`, `QueuePersistence.BeginLoad`, `QueuePersistence.FinishLoad`, `QueuePersistence.RestoreRoom`, `QueueSnapshotStore`, `QueueSnapshotValidation`, `MarketingQueue.SuspendForSave`, `MarketingQueue.CaptureActive`, `MarketingQueue.Restore`, `NativeCampaignProgress`, `PersistenceDiagnostics.Record`
+Symbols: `QueuePersistenceIntegration.Install`, `QueuePersistence.BeginSave`, `QueuePersistence.FinishSave`, `QueuePersistence.BeginLoad`, `QueuePersistence.FinishLoad`, `RoomQueueRestorer.Restore`, `QueueSnapshotCapture.Capture`, `QueuePersistenceNotice`, `QueueSaveCheckpoint`, `QueueLoadCheckpoint`, `QueueSnapshotStore`, `QueueSnapshotValidation`, `MarketingQueue.SuspendForSave`, `MarketingQueueRegistry.CaptureActive`, `MarketingQueueRegistry.SuspendForSave`, `MarketingQueueRegistry.ClearForLoad`, `MarketingQueue.CaptureSnapshot`, `MarketingQueue.Restore`, `NativeCampaignProgress`, `QueueSnapshotStore.NormalizePaidProgressForComparison`, `NativeGameUi.EmployeeSelectionToggle`, `NativeGameUi.MessageDialog`, `PersistenceDiagnostics.Record`
 
 | Entry point | Coverage |
 | --- | --- |
@@ -110,7 +110,7 @@ Metadata updated: 2026-10-26. Source sets: marketing-automation-implementation, 
 
 Keywords: queue, inclusive threshold, admission, cash-only, cap maintenance, Stop Automation, Waiting for eligible products, dormant waiter, Support, ownership, deferred completion, task transfer, selected products
 
-Symbols: `MarketingQueue`, `QueueScheduler.Choose`, `QueueTaskOwnership`, `MarketingQueue.StartCampaign`, `MarketingQueue.LateUpdate`, `MarketingQueue.Stop`, `MarketingQueue.Detach`, `QueueIntegration.Install`, `QueueIntegration.BeforeRoomPanelsPruned`, `QueueIntegration.BeforeCancelConfirmed`, `MarketingProduct.CanMarket`, `NativeCampaignCatalog.Read`
+Symbols: `MarketingQueue`, `QueueScheduler.Choose`, `QueueTaskOwnership`, `MarketingQueue.PurchaseAndBindCampaign`, `MarketingQueue.LateUpdate`, `MarketingQueue.Stop`, `MarketingQueue.StopAfterTaskReplacement`, `QueueIntegration.Install`, `QueueIntegration.BeforeRoomPanelsPruned`, `QueueIntegration.BeforeCancelConfirmed`, `MarketingProduct.CanMarket`, `NativeCampaignCatalog.Read`, `MarketingQueue.DispatchNextCampaignOrWait`, `MarketingQueue.ReconcileTaskBeforeDispatch`, `NativeMarketingTasks.PurchaseCampaign`, `QueueSnapshotCapture.Capture`, `QueuePersistenceIntegration.Install`, `ProductKey`, `NativeRoomControls`, `NativeMarketingRoomWindow`, `NativeWaitingRoomWindow`, `QueueRoomPresentation`, `MarketingQueueRegistry`
 
 | Entry point | Coverage |
 | --- | --- |

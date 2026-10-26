@@ -1,7 +1,7 @@
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Security.Cryptography;
-using MarketingAutomation.GameIntegration;
+using MarketingAutomation.GameIntegration.Marketing;
 
 namespace MarketingAutomation.Persistence;
 
@@ -13,28 +13,22 @@ internal enum SnapshotMatch
     Damaged
 }
 
-// Immutable, content-addressed history. Native files are only opened for reading.
+// Checkpoints are immutable history: <native-file hash>/<checkpoint-payload hash>.json.
+// Different settings for identical native bytes remain a conflict; never choose the newest record.
+// Native files are only opened for reading.
 internal sealed class QueueSnapshotStore
 {
     private const int MaximumRecordBytes = 16 * 1024 * 1024;
-    private readonly string root;
+    private readonly string _root;
 
-    internal QueueSnapshotStore(string root) => this.root = Path.GetFullPath(root);
-
-    internal static string Fingerprint(string nativePath, out long length)
-    {
-        using var stream = new FileStream(nativePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        length = stream.Length;
-        using var sha = SHA256.Create();
-        return Hex(sha.ComputeHash(stream));
-    }
+    internal QueueSnapshotStore(string root) => _root = Path.GetFullPath(root);
 
     internal void Publish(string nativePath, QueueSaveSnapshot snapshot)
     {
         var fingerprint = Fingerprint(nativePath, out var length);
         var payload = Serialize(snapshot);
-        var payloadHash = Hash(payload);
-        var directory = Path.Combine(root, fingerprint);
+        var payloadHash = ComputeHash(payload);
+        var directory = Path.Combine(_root, fingerprint);
         Directory.CreateDirectory(directory);
         var destination = Path.Combine(directory, payloadHash + ".json");
         var envelope = new SnapshotEnvelope
@@ -51,6 +45,11 @@ internal sealed class QueueSnapshotStore
             return;
         }
 
+        WriteNewEnvelope(directory, destination, envelope);
+    }
+
+    private static void WriteNewEnvelope(string directory, string destination, SnapshotEnvelope envelope)
+    {
         var temporary = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
@@ -66,6 +65,7 @@ internal sealed class QueueSnapshotStore
                 stream.Flush(true);
             }
 
+            // Publish only a fully flushed record; interrupted temporary files are ignored by Read.
             File.Move(temporary, destination);
         }
         finally
@@ -81,7 +81,7 @@ internal sealed class QueueSnapshotStore
     {
         snapshot = null;
         fingerprint = Fingerprint(nativePath, out var length);
-        var directory = Path.Combine(root, fingerprint);
+        var directory = Path.Combine(_root, fingerprint);
         if (!Directory.Exists(directory))
         {
             return SnapshotMatch.Missing;
@@ -102,8 +102,8 @@ internal sealed class QueueSnapshotStore
 
                 // Older records kept the pre-save float's extra digits. They
                 // describe the same paid progress when native serialization agrees.
-                NativeCampaignProgress.Normalize(snapshot);
-                var comparablePayload = Hash(Serialize(snapshot));
+                NormalizePaidProgressForComparison(snapshot);
+                var comparablePayload = ComputeHash(Serialize(snapshot));
                 if (chosenPayload != null && chosenPayload != comparablePayload)
                 {
                     conflicting = true;
@@ -116,6 +116,7 @@ internal sealed class QueueSnapshotStore
                                               exception is FormatException || exception is ArgumentException ||
                                               exception is NullReferenceException)
             {
+                // One damaged candidate makes the association untrustworthy, even if another record is valid.
                 snapshot = null;
                 return SnapshotMatch.Damaged;
             }
@@ -130,6 +131,33 @@ internal sealed class QueueSnapshotStore
         return snapshot == null ? SnapshotMatch.Missing : SnapshotMatch.Matched;
     }
 
+    private static void NormalizePaidProgressForComparison(QueueSaveSnapshot snapshot)
+    {
+        if (snapshot?.Rooms == null)
+        {
+            return;
+        }
+
+        foreach (var room in snapshot.Rooms)
+        {
+            if (room?.Paid == null)
+            {
+                continue;
+            }
+
+            room.Paid.Points = NativeCampaignProgress.SerializedValue(room.Paid.Points);
+            room.Paid.PointsLeft = NativeCampaignProgress.SerializedValue(room.Paid.PointsLeft);
+        }
+    }
+
+    internal static string Fingerprint(string nativePath, out long length)
+    {
+        using var stream = new FileStream(nativePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        length = stream.Length;
+        using var sha = SHA256.Create();
+        return FormatHash(sha.ComputeHash(stream));
+    }
+
     private static SnapshotEnvelope ReadEnvelope(string path, string fingerprint, long length)
     {
         var info = new FileInfo(path);
@@ -140,7 +168,7 @@ internal sealed class QueueSnapshotStore
 
         var record = Deserialize<SnapshotEnvelope>(File.ReadAllBytes(path));
         if (record == null || record.Schema != 1 || record.NativeHash != fingerprint || record.NativeLength != length ||
-            record.Payload == null || record.PayloadHash != Hash(Convert.FromBase64String(record.Payload)))
+            record.Payload == null || record.PayloadHash != ComputeHash(Convert.FromBase64String(record.Payload)))
         {
             throw new InvalidDataException("Automation snapshot integrity check failed.");
         }
@@ -161,13 +189,13 @@ internal sealed class QueueSnapshotStore
         return (T)new DataContractJsonSerializer(typeof(T)).ReadObject(stream);
     }
 
-    private static string Hash(byte[] bytes)
+    private static string ComputeHash(byte[] bytes)
     {
         using var sha = SHA256.Create();
-        return Hex(sha.ComputeHash(bytes));
+        return FormatHash(sha.ComputeHash(bytes));
     }
 
-    private static string Hex(byte[] bytes) => BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
+    private static string FormatHash(byte[] bytes) => BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
 
     [DataContract]
     private sealed class SnapshotEnvelope

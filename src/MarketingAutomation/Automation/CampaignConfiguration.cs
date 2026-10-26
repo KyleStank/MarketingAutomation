@@ -1,30 +1,5 @@
 namespace MarketingAutomation.Automation;
 
-// Keep persisted numeric values stable; dropdown order is mapped separately.
-internal enum QueuePriority
-{
-    ReleaseDate = 0,
-    Hype = 1,
-    Name = 2
-}
-
-internal enum QueueDirection
-{
-    Ascending,
-    Descending
-}
-
-internal static class ProductSortOptions
-{
-    private static readonly QueuePriority[] DisplayOrder =
-        { QueuePriority.Name, QueuePriority.Hype, QueuePriority.ReleaseDate };
-
-    internal static System.Collections.Generic.List<string> Labels() => new() { "Name", "Hype", "Release Date" };
-    internal static QueuePriority FromIndex(int index) => DisplayOrder[index];
-    internal static int IndexOf(QueuePriority priority) => Array.IndexOf(DisplayOrder, priority);
-    internal static string Label(QueuePriority priority) => Labels()[IndexOf(priority)];
-}
-
 internal sealed class CampaignConfiguration
 {
     internal QueuePriority Priority
@@ -38,32 +13,6 @@ internal sealed class CampaignConfiguration
         get;
         private set;
     } = QueueDirection.Ascending;
-
-    internal string PrioritySummary => $"{ProductSortOptions.Label(Priority)} / {Direction}";
-
-    internal string PriorityExplanation
-    {
-        get
-        {
-            var order = Priority == QueuePriority.Name
-                ? Direction == QueueDirection.Ascending ? "Names A to Z." : "Names Z to A."
-                : Priority == QueuePriority.Hype
-                    ? Direction == QueueDirection.Ascending
-                        ? "Lower hype first (10 before 85)."
-                        : "Higher hype first (85 before 10)."
-                    : Direction == QueueDirection.Ascending
-                        ? "Older releases first."
-                        : "Newer releases first.";
-            return order + " Ineligible or unaffordable products are skipped.\n" +
-                   "A product being marketed keeps priority until its campaign cap unless blocked.";
-        }
-    }
-
-    internal void SetPriority(QueuePriority priority, QueueDirection direction)
-    {
-        Priority = priority;
-        Direction = direction;
-    }
 
     internal int SelectedCampaign
     {
@@ -84,6 +33,12 @@ internal sealed class CampaignConfiguration
     }
 
     internal bool HasSelection => SelectedCampaign >= 0;
+
+    internal void SetPriority(QueuePriority priority, QueueDirection direction)
+    {
+        Priority = priority;
+        Direction = direction;
+    }
 
     internal void Select(int campaign, int hypeCap, bool unlocked)
     {

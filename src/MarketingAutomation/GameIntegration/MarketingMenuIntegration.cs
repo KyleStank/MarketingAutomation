@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using MarketingAutomation.UI;
 
 namespace MarketingAutomation.GameIntegration;
@@ -12,8 +12,10 @@ public class MarketingMenuIntegration : BaseIntegration
             nameof(Menu_Marketing_Main.Init),
             [typeof(roomScript)]);
         if (initializeMenu == null || initializeMenu.ReturnType != typeof(void))
+        {
             throw new MissingMethodException(
                 $"{nameof(Menu_Marketing_Main)}.{nameof(Menu_Marketing_Main.Init)}({nameof(roomScript)}) is unavailable");
+        }
 
         harmony.Patch(initializeMenu,
             postfix: new HarmonyMethod(typeof(MarketingMenuIntegration), nameof(PatchInitializeMenu)));
@@ -24,7 +26,8 @@ public class MarketingMenuIntegration : BaseIntegration
         Menu_Marketing_Main __instance,
         [HarmonyArgument(0)] roomScript room)
     {
-        if (!__instance || !room) return;
+        if (!__instance || !room)
+            return;
 
         var extension = __instance.GetComponent<MarketingMenuExtension>();
         if (!extension)
