@@ -7,11 +7,10 @@
   "scope": "mod-specific",
   "summary": "Current room-local cap-maintenance scheduler, one-shot paid native tasks, owned dormant Waiting, Stop/Cancel/Support adapters, transfer limits and persistence handoffs.",
   "project": "MarketingAutomation",
-  "code_revision": "Working source inspected on 2026-10-22; includes uncommitted changes; citations identify the relevant files and symbols",
   "domains": ["marketing", "automation", "rooms", "integration"],
   "keywords": ["queue", "inclusive threshold", "admission", "cash-only", "cap maintenance", "Stop Automation", "Waiting for eligible products", "dormant waiter", "Support", "ownership", "deferred completion", "task transfer", "selected products"],
   "symbols": ["MarketingQueue", "QueueScheduler.Choose", "QueueTaskOwnership", "MarketingQueue.StartCampaign", "MarketingQueue.LateUpdate", "MarketingQueue.Stop", "MarketingQueue.Detach", "QueueIntegration.Install", "QueueIntegration.BeforeRoomPanelsPruned", "QueueIntegration.BeforeCancelConfirmed", "MarketingProduct.CanMarket", "NativeCampaignCatalog.Read"],
-  "source_sets": ["marketing-automation-implementation", "mgt2-managed-2026-10-22"],
+  "source_sets": ["marketing-automation-implementation", "mgt2-managed"],
   "related": [
     {"id": "configuration-ui", "relationship": "Owns confirmed copied form configuration and independent display sorting."},
     {"id": "marketing-task-completion", "relationship": "Owns native paid completion/accounting that the queue preserves with automatic=false."},
@@ -23,7 +22,7 @@
     {"id": "bootstrap-and-deployment", "relationship": "Owns plugin startup, patch installation and compatibility gates."}
   ],
   "created": "2026-10-22",
-  "updated": "2026-10-22",
+  "updated": "2026-10-26",
   "entry_points": [
     {"label": "Admission and priority", "anchor": "selection-admission-and-current-product-retention", "summary": "Inclusive entry threshold, productive cap/cash guards, blocked skip and current product retention."},
     {"label": "Native paid unit", "anchor": "f-002---each-dispatched-campaign-is-one-cash-funded-native-one-shot", "summary": "Immediate FindScripts, native fields, one debit, false flags and deferred completion observation."},
@@ -39,24 +38,18 @@
 
 ## Overview and Coverage
 
-This report describes the inspected **current working-tree implementation**, rather than an earlier
-finite-pass or checkbox-driven queue proposal. The implementation repeatedly maintains explicitly
-selected games/consoles toward one campaign cap, admits work at an inclusive configured threshold,
-requires cash for every purchase, and uses one ordinary native task per paid campaign. No file in the
-mod implementation was changed while preparing this report.
-
-The product authority remains [REQUIREMENTS.md](../../REQUIREMENTS.md), especially Task scheduling,
-Multiple rooms and Support, and Persistence. This report explains what code currently does and where
-native adapters/validation boundaries lie; it is not another requirements specification.
+Room-local scheduling, native paid-task creation, dormant Waiting, ownership adapters and
+Support integration. [Scheduling and control policy](../../docs/behavior.md#scheduling)
+defines intended behavior. This report describes the source inspected on 2026-10-22,
+including the transferred-waiter discrepancy in F-005 and pause qualifications in F-006.
 UI composition belongs to [configuration-ui](configuration-ui.md); exact save matching belongs to
 [persistence-and-recovery](persistence-and-recovery.md).
 
 ## Source References and Applicability
 
-Source set `marketing-automation-implementation` locates the current project sources. The implementation
-was inspected on 2026-10-22, including uncommitted changes. File and symbol citations identify the relevant
-behavior; routine development changes do not require a new source set or file inventory.
-Native premises use `mgt2-managed-2026-10-22`; resolve sets through [SOURCES.yaml](../../tools/mgt2-mod-toolkit/research/SOURCES.yaml).
+Source set `marketing-automation-implementation` in [SOURCES.yaml](../SOURCES.yaml) locates the project sources. The implementation
+was inspected on 2026-10-22. Verify named methods if later edits move the cited lines.
+Native premises use `mgt2-managed` from the [shared registry](../../tools/mgt2-mod-toolkit/research/SOURCES.yaml).
 
 `M/` below means `src/MarketingAutomation/`. Primary code:
 
@@ -69,10 +62,6 @@ Native premises use `mgt2-managed-2026-10-22`; resolve sets through [SOURCES.yam
 | `M/GameIntegration/MarketingProduct.cs:7-110` | Live native references, runtime typed key, marketability and release-date inputs |
 | `M/GameIntegration/NativeCampaignCatalog.cs:15-59` | Live arrays, prices/work/cap/gain validation and unlocks |
 | `M/UI/ProductSelection.cs:3-40` | ProductKind and runtime ProductKey including instance ID |
-
-Names are in current `MarketingAutomation.Automation`, `.GameIntegration`, `.Persistence` and `.UI`
-namespaces. Exact native names remain external bindings. Report line references describe inspected text;
-verify method symbols if later refactoring moves them.
 
 ## Architecture and State Ownership
 
@@ -201,8 +190,8 @@ Bound-ID mismatch calls `Detach` and Stops the queue (`MarketingQueue.cs:115-120
 paid task is left to its new room; there is no attempt to refund, move it back or follow it. **Waiter
 qualification:** `Stop -> ReleaseWaiter` deactivates/destroys its bound waiter even after room-ID mismatch;
 `ClearBinding` only clears the old room when its ID still matches (`:301-323`). The implementation therefore
-does not establish preservation of a transferred owned waiter. This edge needs review/runtime evidence;
-do not replace that fact with the broader intended “preserve reassigned tasks” claim.
+does not establish preservation of a transferred owned waiter; runtime reachability and destination cleanup
+remain unresolved (F-005).
 
 OnDestroy Stops/unregisters the room queue. Global removal Stops all enumerated queues. Task markers
 are not independent automation controllers and do not retain a configuration preset.
@@ -285,29 +274,33 @@ finite-pass bookkeeping or normalize native subordinate booleans as part of this
 Keep ownership checks and deferred completion observation when changing scheduling. A native completion
 postfix alone is insufficient if automatic repetition remains enabled. Changing queue priority must not
 preempt paid work or discard admitted continuation above threshold. Architectural research provides
-no authorization to fix native accounting, change Support pause, or add multiplayer scheduling.
+no evidence that changing native accounting or Support pause is required by the queue.
 
 ## Unknowns and Validation
 
-- Q-001: Transferred owned waiter handling in F-005 needs review before claiming all transfer cases
-  preserve reassigned tasks. No implementation change or runtime experiment was performed here.
-- Q-002: Same-frame completion with critical work and several employees/assistants, Stop/Cancel ordering,
-  and object-ID reuse require disposable runtime checks.
-- Q-003: Support leader-only pause retains native inference; assistant idle/resume during custom Waiting
-  and task switching is an intended integrated path, not an individually documented test outcome here.
-- Q-004: Native autosave continuity remains unverified; the recorded user reports say autosave has not
-  triggered, including before the mod. No cause is attributed by this report.
-- Prior evidence, recorded in `README.md:381-419` on 2026-10-21: the user accepted the functional queue/UI
-  and reported successful manual new-slot, repeated-load, restart, Waiting restoration, overwrite and
-  Stop persistence scenarios after IO corrections. These are user-reported observations of the accepted
-  baseline, not exhaustive current-refactor runtime validation or evidence for every edge above.
-- `tests/MarketingAutomation.Checks/QueueSchedulerChecks.cs:5-78` contains isolated scheduler scenarios
-  for admission, caps, cash, priority, missing dates, invalid hype and blocked continuation. Test existence
-  is distinct from running them. As of 2026-10-22, validation for this report did not rerun the .NET checks, compile,
-  deploy, launch the game, or inspect personal saves.
+The user-reported baseline documented with the 2026-10-22 inspection supports functional single-player queue/UI behavior;
+manual persistence observations are recorded once in
+[persistence F-004](persistence-and-recovery.md#f-004---user-acceptance-supports-manual-continuity-within-stated-limits).
+Those observations do not validate subsequent source edits or every ownership/Support edge.
+[QueueSchedulerChecks.cs](../../tests/MarketingAutomation.Checks/QueueSchedulerChecks.cs)
+owns isolated scheduling cases; it does not execute Unity tasks or Harmony hooks.
 
-## Revision Notes
+- Q-001: Transferred owned waiter handling (F-005) needs runtime reachability and destination-cleanup review.
+- Q-002: Same-frame completion with multiple employees/assistants, Stop/Cancel ordering and object-ID reuse need native checks.
+- Q-003: Support idle/resume across Waiting/task switches is not individually runtime-verified. Leader-only pause retains the native uncertainty.
+- Q-004: Autosave continuity remains unverified; see persistence Q-001.
 
-- 2026-10-22: Established current-code integration account with honest working-tree revision. Separated
-  mod policy from native flags, identified initialization-wide window retention, distinguished immediate
-  confirmation from background pause gates, and recorded the transferred-waiter cleanup limitation.
+### Runtime regression checks
+
+Use disposable single-player sessions for changed integration paths:
+
+- Start below threshold; observe paid continuation above threshold, cap rotation and re-entry after decay.
+  Check mixed game/console prices and cash-blocked Waiting without an extra debit.
+- While Waiting, verify caption/room-UI visibility, no spending or hype, and automatic resumption.
+  Stop and Cancel must remove the waiter without leaving an orphan task.
+- Stop during paid work; it should finish once without restart. Cancel paid work and compare the native
+  unfinished-work refund. Transfer/replace paid work and verify the queue neither follows nor reclaims it.
+- Use two independent rooms and Support assistants. Check Waiting idle/resume and completion under
+  concurrent employee work; exercise transferred waiters specifically against F-005.
+
+These scenarios target native integration; they are not individual pass claims.

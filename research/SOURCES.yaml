@@ -11,9 +11,10 @@
       "id": "marketing-automation-implementation",
       "summary": "Current Marketing Automation implementation, toolkit configuration dependency and documentation locations; separate from reusable native research.",
       "provenance": [
-        "Integration reports describe the source paths and behavior inspected on their stated research date. Uncommitted changes are normal; no working-tree inventory or mod-file hashes are maintained.",
+        "Integration reports describe the source paths and behavior inspected on their stated research date; later source edits require task-specific verification.",
         "On 2026-10-22, the existing generated package graph resolved BepInEx.Core/5.4.21, HarmonyX/2.7.0 and UnityEngine.Modules/2022.3.2; no restore was run for this observation.",
-        "User acceptance statements are attributed documentation evidence and do not establish all lifecycle/recovery scenarios."
+        "User acceptance statements are attributed documentation evidence and do not establish all lifecycle/recovery scenarios.",
+        "docs/behavior.md owns intended product behavior; AGENTS.md owns contributor instructions. Integration reports identify their inspected code and distinguish static findings, isolated checks and attributed runtime observations."
       ],
       "artifacts": [
         {
@@ -54,7 +55,11 @@
         },
         {
           "root": "workspace",
-          "path": "REQUIREMENTS.md"
+          "path": "AGENTS.md"
+        },
+        {
+          "root": "workspace",
+          "path": "docs/behavior.md"
         }
       ]
     }

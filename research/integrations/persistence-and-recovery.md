@@ -4,14 +4,13 @@
   "id": "persistence-and-recovery",
   "kind": "integration",
   "title": "Marketing Automation persistence and recovery",
-  "summary": "Current single-player Save/Load wrappers, immutable exact-byte checkpoint history, native paid-task adoption, transient waiter exclusion, numerical correction, diagnostics, and validation limits.",
+  "summary": "Single-player Save/Load wrappers, immutable exact-byte checkpoints, native paid-task adoption, transient exclusion, numerical compatibility, diagnostics and validation limits.",
   "scope": "mod-specific",
   "project": "MarketingAutomation",
-  "code_revision": "Working source inspected on 2026-10-22; includes uncommitted changes; citations identify the relevant files and symbols",
   "domains": ["persistence", "marketing", "recovery", "integration"],
   "keywords": ["snapshot", "immutable history", "SHA-256", "Stop", "Waiting", "admission", "paid progress", "G7", "employee toggle", "diagnostics", "autosave"],
   "symbols": ["QueueIntegration.Install", "QueuePersistence.BeginSave", "QueuePersistence.FinishSave", "QueuePersistence.BeginLoad", "QueuePersistence.FinishLoad", "QueuePersistence.RestoreRoom", "QueueSnapshotStore", "QueueSnapshotValidation", "MarketingQueue.SuspendForSave", "MarketingQueue.CaptureActive", "MarketingQueue.Restore", "NativeCampaignProgress", "PersistenceDiagnostics.Record"],
-  "source_sets": ["mgt2-managed-2026-10-22", "marketing-automation-implementation"],
+  "source_sets": ["mgt2-managed", "marketing-automation-implementation"],
   "related": [
     {"id": "native-save-lifecycle", "relationship": "Provides actual native Save/Load order, ES3 sharing/number representation, and preference callback constraints"},
     {"id": "save-identity-and-task-restoration", "relationship": "Defines snapshot/object identity limits and native paid-task fields"},
@@ -21,12 +20,12 @@
     {"id": "multiplayer-session-and-save-coordination", "relationship": "Documents native multiplayer research; this persistence implementation explicitly excludes MP restoration"}
   ],
   "created": "2026-10-22",
-  "updated": "2026-10-22",
+  "updated": "2026-10-26",
   "entry_points": [
     {"label": "Checkpoint contract", "anchor": "checkpoint-model-and-storage", "summary": "Schema fields, typed identities, hash/payload addressing and immutable history"},
     {"label": "Save wrapper", "anchor": "save-capture-publication-and-cleanup", "summary": "Capture, owned transient exclusion, native exception preservation and external publication"},
     {"label": "Load reconciliation", "anchor": "load-and-native-paid-task-adoption", "summary": "Header/object/task validation and adoption without payment"},
-    {"label": "IO corrections", "anchor": "rounding-and-preference-corrections", "summary": "G7 checkpoint comparison, historical normalization, and silent load-time toggle initialization"},
+    {"label": "Native representation and preferences", "anchor": "native-representation-and-preferences", "summary": "G7 comparison, legacy checkpoint normalization and silent load-time toggle initialization."},
     {"label": "Validation evidence", "anchor": "unknowns-and-validation", "summary": "User-reported baseline versus isolated checks and still-unexecuted failure/autosave/MP cases"}
   ]
 }
@@ -36,24 +35,16 @@
 
 ## Overview and Coverage
 
-This report describes the implemented single-player checkpoint integration, not a generic native save feature.
-It preserves active selected-product automation across native saves without adding fields to `.sav` files.
-Matching restored paid campaigns are adopted; missing, incompatible, damaged or conflicting associations leave
-automation off while ordinary native paid work remains available.
-
-Product policy is authoritative in [REQUIREMENTS.md](../../REQUIREMENTS.md), particularly Persistence and I/O,
-Stop, Waiting, and multiplayer exclusions. Current policy persists only active queues, including Waiting. Stop
-immediately discards configuration; stopped settings are not presets. Historical snapshots of earlier native
-states remain retained. Open configuration-form drafts are not durable queue settings.
-
-The code inspected here is the working tree recorded in metadata. Validation as of 2026-10-22 is static source
-inspection; native save execution and gameplay acceptance scenarios were not rerun. Personal saves were not read.
+Single-player checkpoint storage, native Save/Load hooks, paid-task adoption and recovery failure
+boundaries. [Saving and restoration policy](../../docs/behavior.md#saving-and-restoring) defines
+intended behavior. This report records implementation mechanisms and their evidence limits.
+Native serialization and task reconstruction remain owned by the game.
 
 ## Source References and Applicability
 
 Mod source root: `src/MarketingAutomation/`, abbreviated `M/` below. Source set
 `marketing-automation-implementation` locates the project sources inspected on the report's research date. Native
-constraints use `mgt2-managed-2026-10-22` and the related standalone native reports.
+constraints use `mgt2-managed` and the related standalone native reports.
 
 | Area | Inspected source |
 | --- | --- |
@@ -67,10 +58,8 @@ constraints use `mgt2-managed-2026-10-22` and the related standalone native repo
 | Persistent IO diagnostics | `M/Persistence/PersistenceDiagnostics.cs:5–21` |
 | Isolated checks | `tests/MarketingAutomation.Checks/QueuePersistenceChecks.cs`; `NativeCampaignProgressChecks.cs` |
 
-Runtime observations are project-recorded user reports, summarized in README's Working version-one baseline
-and the active project instructions. No additional runtime observation supports this report as of 2026-10-22. They describe
-the accepted build around 2026-10-21, without a captured binary hash per individual scenario. Avoid converting
-those reports into exact financial comparisons or a claim that every listed regression case was exercised.
+F-004 records user runtime observations documented with the 2026-10-22 inspection.
+No per-scenario observation date or binary hash was captured; those observations do not validate later source edits.
 
 ## Architecture and State Ownership
 
@@ -166,7 +155,7 @@ Header/duplicate-record failures reject the snapshot. Live binding failures are 
 independently valid room records can restore. Errors produce warnings and a deferred native message box; missing
 records merely log that native paid campaigns remain unchanged. This is not a whole-snapshot transactional restore.
 
-### Rounding and preference corrections
+### Native representation and preferences
 
 `NativeCampaignProgress.SerializedValue(float)` explicitly converts through invariant `G7` text and float.Parse.
 `Matches` accepts exact equality or equality after checkpoint serialization, with finite guards. Normalization
@@ -187,7 +176,7 @@ confirmation. The native callback path is documented in native-save-lifecycle F-
 ### Diagnostics
 
 `PersistenceDiagnostics.Record` appends UTC timestamp, stage/reason and exception to
-`BepInEx/MarketingAutomation.IO.log`; failure to append falls back to a loader warning
+`game_directory` + `BepInEx/MarketingAutomation.IO.log`; failure to append falls back to a loader warning
 (`M/Persistence/PersistenceDiagnostics.cs:5–21`). Errors distinguish capture, native Save, publication, cleanup,
 read, snapshot validation and per-room restoration, including expected/loaded work when progress differs.
 Append-only diagnostics survive normal per-session log replacement; they do not guarantee successful logging
@@ -239,7 +228,7 @@ Explanation: Admission survives loading above the entry threshold. Threshold cla
 
 ### F-004 - User acceptance supports manual continuity within stated limits
 
-Statement: The project records user-reported successful repeated manual save/load, full restart and Waiting restoration, with no further reported manual-save issues after IO corrections.
+Statement: User observations support repeated manual save/load, full restart, Waiting restoration, overwrites and stopped-state persistence for the accepted baseline.
 
 Basis: runtime-observation
 
@@ -247,13 +236,15 @@ Standing: current
 
 Applies to: marketing-automation-implementation
 
-Evidence: `README.md`, Working version-one baseline and native acceptance checklist; current project working instructions, build/validation evidence recorded for 2026-10-21.
+Evidence: User-reported gameplay documented with the 2026-10-22 inspection, source set
+`marketing-automation-implementation`; per-scenario observation dates, build fingerprints and independent replays
+were not recorded.
 
-Explanation: Observer is the user; this finding relies on the previously recorded observations. Initial scenario loaded a pre-mod save,
-started automation, saved to a new slot and repeatedly observed restored state. Later reports include restart,
-Waiting, stopped queues/overwrites and no remaining manual-save problems. Exact per-scenario binary hashes,
-cash/work comparisons and every proposed corruption/failure/removal edge were not independently recorded.
-Autosave never triggered in reported testing, also reportedly before installing the mod; no cause is established.
+Explanation: The user started automation from a pre-mod save, saved into a new slot and repeatedly loaded
+its observed state. Reported coverage also includes full restart, Waiting, overwrites and Stop remaining
+stopped. Exact cash/work comparisons and proposed corruption/failure/removal cases were not individually
+recorded. Autosave did not trigger in the user's testing; its cause is unknown. Acceptance applies to that
+baseline, not subsequent readability or UI donor-copy edits.
 
 ## Connections to Other Systems
 
@@ -268,43 +259,45 @@ queue scanning rejects MP. The presence of native MP hooks through the shared me
 
 ## Mod Integration Implications
 
-Future maintainability work must preserve serialized type/member names, enum values, content/payload envelope
-contracts and equivalent historical progress normalization. A new schema needs explicit compatibility handling;
-unknown versions currently stop restoration. Do not coerce malformed settings into apparently valid running work.
+Preserve serialized type/member names, enum values, content/payload envelopes and equivalent legacy
+progress normalization. An unknown schema disables restoration; compatibility work needs explicit handling.
+Do not coerce malformed settings into running work or rewrite loaded native progress to make it match.
 
-Stop is not a dormant preset: stopped queues do not enter `CaptureActive`. The already-paid native task may
-still finish after Stop without any queue restart. Previously saved active snapshots remain historical state;
-a subsequent stopped snapshot contains no active record. Conflicting different external configurations against
-the exact same native bytes deliberately disable matching rather than guessing.
-
-External record transfer must accompany native snapshots to another machine; Cloud coverage is unestablished.
-There is no automatic repair, deletion/history purge or fuzzy adoption policy. Adding one would be a product
-change. None of those features should be inferred from the presence of checksummed files.
+A save after Stop can contain unfinished paid work but no active queue record. If different external
+configurations match identical native bytes, conflict rejection prevents selecting either by recency.
+Native and external commits are separate; a valid native save may exist without a matching checkpoint.
 
 ## Unknowns and Validation
 
-| Evidence class | What exists | Practical limit |
-| --- | --- | --- |
-| Static inspection on 2026-10-22 | Reopened production wrappers/store/model/validation/queue/progress/diagnostic code and native constraints | Does not execute Unity, Harmony, real Save/Load or filesystem failure modes. |
-| Isolated checks present in source | Disposable fake-native files cover roundtrip, native-byte preservation, copies, slot reuse/history, empty/stopped snapshots, conflicts, corruption, temporary records, schema/header rejection, typed IDs, restored admission and rounded legacy records | Files contain test text, not native game data; checks do not prove Unity task adoption or native writer compatibility. They were read, not rerun for this report. |
-| Numeric checks present in source | `NativeCampaignProgressChecks` uses `123.45678f`, finite/changed-progress rejection, en-US/fr-FR and idempotent G7 normalization | Emulates installed-formatter behavior on the check runtime; not a new installed-Mono experiment. |
-| User runtime evidence | Accepted manual-save/restart/Waiting baseline, no further issues reported after IO corrections | Does not establish all proposed acceptance/failure/removal cases or exact finance comparisons. |
+| Evidence | Scope and limit |
+| --- | --- |
+| Source inspection, 2026-10-22 | Wrappers, store, model, validation, queue adoption and native constraints; no Unity/Harmony execution. |
+| [QueuePersistenceChecks.cs](../../tests/MarketingAutomation.Checks/QueuePersistenceChecks.cs) | Disposable files and model validation; not native saves, real writer compatibility or Unity task adoption. |
+| [NativeCampaignProgressChecks.cs](../../tests/MarketingAutomation.Checks/NativeCampaignProgressChecks.cs) | Representation/legacy-normalization checks on modern .NET; not an installed-Mono experiment. |
+| User reports in F-004 | Manual continuity of the accepted baseline; no exhaustive recovery or subsequent-source acceptance. |
 
-- **Q-001 — Autosave:** static Save integration covers the shared method, but timer-triggered restoration is
-  unverified because no trigger was observed. The mod does not modify scheduler/preferences/countdown.
-- **Q-002 — Failure/removal:** failed native writes, disk-full/power loss, interrupted publication, corrupt/missing
-  histories and mod removal need their own disposable native scenarios before being called runtime-passed.
-- **Q-003 — Initial intermittent warning:** one reported mid-campaign failure was not reproducible and its exact
-  earlier logged cause was unavailable. Numeric and toggle paths explain concrete defects; they do not prove the
-  unknown intermittent warning was reproduced or had one of those exact causes.
+- **Q-001 — Autosave:** the common Save method is hooked, but timer-triggered restoration remains unverified.
+  The mod does not modify the scheduler, preferences or countdown; the missing trigger's cause is unknown.
+- **Q-002 — Failure/removal:** native write failure, disk-full/power loss, interrupted publication, damaged/missing
+  histories and mod removal need disposable native scenarios before being called runtime-passed.
+- **Q-003 — Unattributed warning:** a nonreproducible mid-campaign warning lacks its original diagnostic log;
+  its cause cannot be assigned to the known numeric or preference-callback defects.
 - **Q-004 — Cross-runtime/Cloud:** G7 compatibility on other native runtimes and external-directory Cloud
-  synchronization remain unverified. Native MP support remains deferred.
-- **Q-005 — Restore atomicity:** per-room restore may partially succeed; native and external files are separate
-  commits. Documentation must retain these limits rather than promising transaction-wide rollback.
+  synchronization are unverified. Multiplayer remains outside the supported scope.
+- **Q-005 — Restore atomicity:** independently valid rooms may restore when another room fails; native and
+  external files commit separately. There is no whole-restore rollback guarantee.
 
-## Revision Notes
+### Runtime regression checks
 
-- **2026-10-22:** Documented the current implementation separately from native game architecture. Preserved
-  active-only persistence, no-preset Stop, strict adoption, immutable history/conflict policy, numeric/UI
-  corrections and attributable user evidence. Earlier checkbox/finite-pass/all-configured retention proposals
-  are not described as the implementation. No runtime test, game file or personal save was changed.
+Use disposable single-player saves for changed persistence paths:
+
+- Save/load during paid work and Waiting. Check settings, admitted continuation above threshold,
+  remaining work, no duplicate charge and automatic Waiting resume. Save after Stop; no queue should restart.
+- Compare another slot, overwrite, older state and byte-identical copy with their exact matching records.
+  Missing, damaged or conflicting records must leave automation off while native work loads normally.
+- Exercise timer-triggered autosave, failed native writing/publication and mod removal when feasible.
+  Check transient Marketing waiters are excluded and live bindings recover after saving or failure.
+- Check employee-toggle preferences load silently while normal manual clicks retain native confirmation.
+
+Inspect `game_directory` + `BepInEx/MarketingAutomation.IO.log` and `BepInEx/LogOutput.log`.
+These are proposed native integration checks, not individual pass claims.

@@ -23,7 +23,7 @@ for native-game and toolchain findings. Shared records are referenced, not copie
 Current project target/references, plugin startup/fallback/teardown and configuration/deployment scripts, separated from generic game and loader behavior.
 
 Report: [Marketing Automation bootstrap and deployment](integrations/bootstrap-and-deployment.md). Kind: integration; scope: mod-specific.
-Metadata updated: 2026-10-22. Source sets: marketing-automation-implementation, mgt2-toolchain-2026-10-22, mgt2-runtime-2026-10-22.
+Metadata updated: 2026-10-26. Source sets: marketing-automation-implementation, mgt2-toolchain, mgt2-runtime.
 
 Keywords: build, netstandard2.1, BepInEx.Core, HarmonyX, DeployToGame, initialize, config, plugin GUID, MVID, UnpatchSelf
 
@@ -32,13 +32,14 @@ Symbols: `MarketingAutomation.MarketingAutomationPlugin`, `PluginMetadata`, `Que
 | Entry point | Coverage |
 | --- | --- |
 | [Framework and references](integrations/bootstrap-and-deployment.md#f-001---this-project-targets-netstandard21-with-compile-only-game-references) | Actual project configuration; distinguish restored package graph from installed loader. |
-| [Startup and fallback](integrations/bootstrap-and-deployment.md#behavior-and-call-flows) | MVID/signature gate, menu extension, queue hooks and cleanup. |
+| [Startup and fallback](integrations/bootstrap-and-deployment.md#behavior-and-call-flows) | MVID warning, signature validation, menu extension, queue hooks and cleanup. |
 | [Deployment side effects](integrations/bootstrap-and-deployment.md#f-004---ordinary-builds-can-deploy-only-the-plugin-and-symbols) | Default post-build deploy, literal config, core-layout check and explicit skip. |
-| [Validation limits](integrations/bootstrap-and-deployment.md#unknowns-and-validation) | Static inspection as of 2026-10-22; build, deployment and gameplay were not rerun. |
+| [Validation limits](integrations/bootstrap-and-deployment.md#unknowns-and-validation) | Recorded Windows evidence, unverified platform/cleanup cases and current runtime coverage limits. |
+| [Current startup identity checks](integrations/bootstrap-and-deployment.md#f-002---startup-warns-on-module-mismatch-and-validates-the-menu-signature) | Warn-only MVID check and separate menu signature validation, inspected 2026-10-26. |
 
 Related:
 
-- [runtime-and-source-identity](../tools/mgt2-mod-toolkit/research/INDEX.md#runtime-and-source-identity): Native player/module identity is an input to this plugin's capability gate.
+- [runtime-and-source-identity](../tools/mgt2-mod-toolkit/research/INDEX.md#runtime-and-source-identity): Native player/module identity bounds applicability of startup checks.
 - [loader-and-patching-boundaries](../tools/mgt2-mod-toolkit/research/INDEX.md#loader-and-patching-boundaries): Third-party plugin and patch ownership behavior.
 - [configuration-ui](#configuration-ui): UI extension attached by the menu Init postfix.
 - [queue-and-room-integration](#queue-and-room-integration): Queue hooks installed during bootstrap and removed on destruction.
@@ -46,14 +47,14 @@ Related:
 
 ## configuration-ui
 
-Actual working-tree Automation entry, native visual adapters, two-page draft lifecycle, mixed product selection, independent display sorting, campaign/priority/threshold controls and queue confirmation boundary.
+Automation menu bindings, draft ownership, pooled selection, independent sorting, control callbacks and queue handoff, with runtime coverage limits.
 
 Report: [Marketing Automation configuration UI integration](integrations/configuration-ui.md). Kind: integration; scope: mod-specific.
-Metadata updated: 2026-10-22. Source sets: marketing-automation-implementation, mgt2-managed-2026-10-22, mgt2-unity-export-2026-10-22.
+Metadata updated: 2026-10-26. Source sets: marketing-automation-implementation, mgt2-managed, mgt2-unity-export.
 
 Keywords: Automation entry, configuration draft, Select All, pooled rows, search, multipage, threshold, queue priority, display sorting, Escape, native control adapters, validation dialog
 
-Symbols: `MarketingAutomationPlugin.AfterMarketingMenuInitialized`, `MarketingMenuExtension`, `AutomationScreen`, `AutomationFormState`, `AutomationCampaignPage`, `ProductListView`, `ProductRow`, `ProductSelection`, `ProductKey`, `ProductListSorting`, `NativeDropdown`, `NativeUi`, `SearchInputFocus`, `CampaignConfiguration`, `ProductSortOptions`, `NativeCampaignCatalog`, `MarketingQueue.TryStart`
+Symbols: `MarketingMenuIntegration.PatchInitializeMenu`, `MarketingMenuExtension`, `AutomationScreen`, `AutomationFormState`, `AutomationCampaignPage`, `ProductListView`, `ProductRow`, `ProductSelection`, `ProductKey`, `ProductListSorting`, `NativeDropdown`, `NativeUi`, `SearchInputFocus`, `CampaignConfiguration`, `ProductSortOptions`, `NativeCampaignCatalog`, `MarketingQueue.TryStart`
 
 | Entry point | Coverage |
 | --- | --- |
@@ -61,6 +62,7 @@ Symbols: `MarketingAutomationPlugin.AfterMarketingMenuInitialized`, `MarketingMe
 | [Open navigate close confirm](integrations/configuration-ui.md#behavior-and-call-flows) | Picker layering, root closure reset, freely navigable child pages and native error dialogs. |
 | [Display sort versus queue priority](integrations/configuration-ui.md#f-003--display-order-and-queue-priority-share-labels-but-use-separate-state-and-rules) | Native descending list keys versus configurable dispatch directions and persisted enum mapping. |
 | [Actual validation boundary](integrations/configuration-ui.md#unknowns-and-validation) | User acceptance predates current readability refactor; current evidence is static only. |
+| [Visual binding locators](integrations/configuration-ui.md#native-visual-bindings) | Mod donor use and export-local identities requiring binding revalidation. |
 
 Related:
 
@@ -73,10 +75,10 @@ Related:
 
 ## persistence-and-recovery
 
-Current single-player Save/Load wrappers, immutable exact-byte checkpoint history, native paid-task adoption, transient waiter exclusion, numerical correction, diagnostics, and validation limits.
+Single-player Save/Load wrappers, immutable exact-byte checkpoints, native paid-task adoption, transient exclusion, numerical compatibility, diagnostics and validation limits.
 
 Report: [Marketing Automation persistence and recovery](integrations/persistence-and-recovery.md). Kind: integration; scope: mod-specific.
-Metadata updated: 2026-10-22. Source sets: mgt2-managed-2026-10-22, marketing-automation-implementation.
+Metadata updated: 2026-10-26. Source sets: mgt2-managed, marketing-automation-implementation.
 
 Keywords: snapshot, immutable history, SHA-256, Stop, Waiting, admission, paid progress, G7, employee toggle, diagnostics, autosave
 
@@ -87,7 +89,7 @@ Symbols: `QueueIntegration.Install`, `QueuePersistence.BeginSave`, `QueuePersist
 | [Checkpoint contract](integrations/persistence-and-recovery.md#checkpoint-model-and-storage) | Schema fields, typed identities, hash/payload addressing and immutable history |
 | [Save wrapper](integrations/persistence-and-recovery.md#save-capture-publication-and-cleanup) | Capture, owned transient exclusion, native exception preservation and external publication |
 | [Load reconciliation](integrations/persistence-and-recovery.md#load-and-native-paid-task-adoption) | Header/object/task validation and adoption without payment |
-| [IO corrections](integrations/persistence-and-recovery.md#rounding-and-preference-corrections) | G7 checkpoint comparison, historical normalization, and silent load-time toggle initialization |
+| [Native representation and preferences](integrations/persistence-and-recovery.md#native-representation-and-preferences) | G7 comparison, legacy checkpoint normalization and silent load-time toggle initialization. |
 | [Validation evidence](integrations/persistence-and-recovery.md#unknowns-and-validation) | User-reported baseline versus isolated checks and still-unexecuted failure/autosave/MP cases |
 
 Related:
@@ -104,7 +106,7 @@ Related:
 Current room-local cap-maintenance scheduler, one-shot paid native tasks, owned dormant Waiting, Stop/Cancel/Support adapters, transfer limits and persistence handoffs.
 
 Report: [Marketing Automation queue execution and native room integration](integrations/queue-and-room-integration.md). Kind: integration; scope: mod-specific.
-Metadata updated: 2026-10-22. Source sets: marketing-automation-implementation, mgt2-managed-2026-10-22.
+Metadata updated: 2026-10-26. Source sets: marketing-automation-implementation, mgt2-managed.
 
 Keywords: queue, inclusive threshold, admission, cash-only, cap maintenance, Stop Automation, Waiting for eligible products, dormant waiter, Support, ownership, deferred completion, task transfer, selected products
 
@@ -138,7 +140,7 @@ These are recorded evidence sets, not claims that every artifact was revalidated
 
 Shared source definitions: [SOURCES.yaml](../tools/mgt2-mod-toolkit/research/SOURCES.yaml).
 
-- `mgt2-managed-2026-10-22`: Installed managed inputs matched to the ILSpy inventory; source symbols inspected on 2026-10-22.
-- `mgt2-runtime-2026-10-22`: Fresh read-only PE/CLI/file-version/hash observations for original installed player/managed inputs and the Auxiliary comparison.
-- `mgt2-toolchain-2026-10-22`: Fresh installed loader/patch DLL identities and directly inspected clean BepInEx/HarmonyX source checkouts.
-- `mgt2-unity-export-2026-10-22`: Reconstructed Unity scene/prefab/animation paths inspected on 2026-10-22; identifiers are export-local and paths are unhashed locators.
+- `mgt2-managed`: Installed managed inputs matched to the ILSpy inventory; source symbols inspected on 2026-10-22.
+- `mgt2-runtime`: Fresh read-only PE/CLI/file-version/hash observations for original installed player/managed inputs and the Auxiliary comparison.
+- `mgt2-toolchain`: Fresh installed loader/patch DLL identities and directly inspected clean BepInEx/HarmonyX source checkouts.
+- `mgt2-unity-export`: Reconstructed Unity scene/prefab/animation paths inspected on 2026-10-22; identifiers are export-local and paths are unhashed locators.
